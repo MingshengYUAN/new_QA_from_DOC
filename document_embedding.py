@@ -259,7 +259,11 @@ def get_score(fragements, question):
 	similarity = 0
 	for i in fragements:
 		tmp = embedding_function.encode(i).tolist()
-		similarity += np.dot(tmp,question_embedding)/(norm(tmp)*norm(question_embedding))
+		try:
+			tmp_score = np.dot(tmp,question_embedding)/(norm(tmp)*norm(question_embedding))[0]
+		except:
+			tmp_score = np.dot(tmp,question_embedding)/(norm(tmp)*norm(question_embedding))
+		similarity += tmp_score
 	return similarity/len(fragements)
 
 ###########

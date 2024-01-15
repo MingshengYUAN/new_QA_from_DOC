@@ -120,6 +120,7 @@ def answer_from_doc(token_name, question):
 	if len(fragement_candidates) == 0:
 		similarity_score = 0.0
 	else:
+
 		similarity_score = get_score(fragement_candidates, question)
 	
 	prompt = prompter.generate_prompt(question=question, context=fragement_candidates, prompt_serie=conf['prompt']['prompt_serie'])
@@ -128,8 +129,12 @@ def answer_from_doc(token_name, question):
 			'http://192.168.0.91:3090/generate',
 			json = {'prompt': prompt, 'max_tokens': 512, 'temperature': 0.0, 'stream': False}
 		).json()['response'][0]
-	print(f"response: {response}")
-	return response, fragement_candidates, similarity_score[0], ''
+	# print(f"response: {response}")
+	try:
+		fragement_candidates = fragement_candidates[0][0]
+	except:
+		pass
+	return response, fragement_candidates, similarity_score, ''
 	
 ############	
 	
