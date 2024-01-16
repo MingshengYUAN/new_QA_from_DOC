@@ -1,4 +1,4 @@
-{
+template = {
   "swagger": "2.0",
   "info": {
     "title": "QA from DOC API",
