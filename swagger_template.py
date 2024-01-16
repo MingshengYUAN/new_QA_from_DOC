@@ -1,4 +1,4 @@
-template = {
+{
   "swagger": "2.0",
   "info": {
     "title": "QA from DOC API",
@@ -41,45 +41,6 @@ template = {
             "description": "Input status",
             "schema": {
               "$ref": "#/definitions/input_text"
-            }
-          }
-        }
-      }
-    },
-    "/qa_search": {
-      "post": {
-        "tags": [
-          "qa_search"
-        ],
-        "summary": "Find the most similar QA pairs",
-        "description": "",
-        "consumes": [
-          "multipart/form-data"
-        ],
-        "produces": [
-          "application/json"
-        ],
-        "parameters": [
-          {
-            "name": "token_name",
-            "in": "formData",
-            "description": "User questions",
-            "required": True,
-            "type": "list"
-          },
-          {
-            "name": "token_name",
-            "in": "formData",
-            "description": "Specific token name for the excel or the task",
-            "required": True,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful operation",
-            "schema": {
-              "$ref": "#/definitions/ApiResponse"
             }
           }
         }
@@ -139,10 +100,7 @@ template = {
             "description": "Given token name or leave empty will empty all collections",
             "required": True,
             "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/collection_name"
-              }
+              "$ref": "#/definitions/collection_name"
             }
           }
         ],
@@ -150,7 +108,39 @@ template = {
           "200": {
             "description": "Successful operation",
             "schema": {
-              "$ref": "#/definitions/ApiResponse"
+              "$ref": "#/definitions/input_text"
+            }
+          }
+        }
+      }
+    },
+    "/doc_delete": {
+      "post": {
+        "tags": [
+          "doc_delete"
+        ],
+        "summary": "Delect doc",
+        "description": "",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "token_name",
+            "in": "formData",
+            "description": "Specific token name for the doc or the task",
+            "required": True,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "schema": {
+              "$ref": "#/definitions/input_text"
             }
           }
         }
@@ -186,7 +176,7 @@ template = {
           "items": {
             "type": "string"
           },
-          "example": "Save success!"
+          "example": "XXX success!"
         },
         "status": {
           "items": {
@@ -282,8 +272,19 @@ template = {
       }
     },
     "collection_name": {
-      "type": "string",
-      "example": "test"
-    },
+      "type": "object",
+      "required": [
+        "collection_name"
+      ],
+      "properties": {
+        "collection_name": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "example": ["token_name"]
+        }
+      }
+    }
   }
 }

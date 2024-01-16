@@ -21,7 +21,7 @@ args = parser.parse_args()
 args_default = vars(args)
 ShareArgs.update(args_default)
 
-from document_qa_new import build_rag_chain_from_text, answer_from_doc, empty_collection
+from document_qa_new import build_rag_chain_from_text, answer_from_doc, empty_collection, del_select_collection
 
 conf = configparser.ConfigParser()
 conf.read(ShareArgs.args['config_path'], encoding='utf-8')
@@ -92,6 +92,15 @@ def doc_input():
     #     return {"response": "Save Error!", "status": "Fail!", "running_time": float(time.time() - start)}
 
 ###########################
+
+@app.route("/doc_delete", methods=['POST'])
+def doc_delete():
+    start = time.time()
+    token_name = request.form.get('token_name')
+    response = del_select_collection(token_name)
+    return {"response": response, "status": "Success!", "running_time": float(time.time() - start)}
+
+##########################
 
 @app.route("/qa_from_doc", methods=['POST'])
 def qa_from_doc():
