@@ -53,7 +53,7 @@ try:
 except:
 	pass
 
-save_folder = os.path.join(save_folder, str({conf['application']['name']}))
+save_folder = os.path.join(save_folder, conf['application']['name'])
 
 #####################
 
@@ -126,7 +126,7 @@ def qa_from_doc():
     if response == "I don't know" or "I don't know" in response:
         response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
         score = 0.0
-    # print(f"{response} | {fragment} | {score} | {document_name}")
+    print(f"{response} | {fragment} | {score} | {document_name}")
     return {"response": response, "fragment": fragment, "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Answer question Error: {e}")
