@@ -123,7 +123,7 @@ def qa_from_doc():
     # try:
     response, fragment, score, document_name = answer_from_doc(text_name, question)
     logger.info(f"Question Response: {response}")
-    if response == "I don't know" or "I don't know" in response:
+    if response == "I don't know" or ("I don't know" in response and len(response) < 17):
         response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
         score = 0.0
     print(f"{response} | {fragment} | {score} | {document_name}")
