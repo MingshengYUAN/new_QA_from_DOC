@@ -135,6 +135,7 @@ def answer_from_doc(token_name, question):
 	if len(fragement_candidates) == 0:
 		similarity_score = 0.0
 	else:
+
 		similarity_score = get_score(fragement_candidates, question)
 	
 	prompt = prompter.generate_prompt(question=question, context=fragement_candidates, prompt_serie=conf['prompt']['prompt_serie'])

@@ -267,6 +267,7 @@ def get_score(fragements, question):
 		except:
 			pass
 		# print(tmp_score)
+
 		similarity += tmp_score
 	return similarity/len(fragements)
 

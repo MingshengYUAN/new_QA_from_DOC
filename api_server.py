@@ -106,7 +106,9 @@ def doc_delete():
 def qa_from_doc():
     start = time.time()
     data = request.get_json()
+
     # print(f"data: {data}")
+
     new_question = data['question']
     text_name = data['filename']
     try:
@@ -126,7 +128,7 @@ def qa_from_doc():
     if response == "I don't know" or ("I don't know" in response and len(response) < 17):
         response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
         score = 0.0
-    print(f"{response} | {fragment} | {score} | {document_name}")
+    # print(f"{response} | {fragment} | {score} | {document_name}")
     return {"response": response, "fragment": fragment, "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Answer question Error: {e}")
