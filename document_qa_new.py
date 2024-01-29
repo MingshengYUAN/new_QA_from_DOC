@@ -20,11 +20,12 @@ def del_select_collection(token_name):
 		collection = client.get_collection(token_name)
 		num = collection.count()
 		client.delete_collection(token_name)
+		collection = client.get_collection("share")
+		ids_list = [f"{token_name}|__|{i}" for i in range(num)]
+		collection.delete(ids_list)
 	except Exception as e:
 		logger.info(f"DELETE COLLECTION ERROR: {e}")
-	collection = client.get_collection("share")
-	ids_list = [f"{token_name}|__|{i}" for i in range(num)]
-	collection.delete(ids_list)
+		return "Delete ERROR!"
 	return "Delete success"
 
 ####################
