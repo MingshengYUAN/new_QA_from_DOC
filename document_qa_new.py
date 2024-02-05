@@ -49,7 +49,7 @@ def empty_collection(collection_name):
 
 ############
 
-def build_rag_chain_from_text(text, token_name):
+def build_rag_chain_from_text(text, token_name, filename, level='None'):
 	
 	try:
 		client.get_collection(token_name)
@@ -84,10 +84,13 @@ def build_rag_chain_from_text(text, token_name):
 			print(i)
 			all_num+=1
 			continue
-		document_list.append(i['fragement'])
+		document_list.append(i['fragement']+f"|___|{filename}")
 		
 		embedding_list.append(i['searchable_text_embedding'])
-		metadata_list.append({"source": i['searchable_text_type'], "searchable_text": i['searchable_text']})
+		if level != 'None':
+			metadata_list.append({"source": i['searchable_text_type'], "searchable_text": i['searchable_text'], "filename": filename, 'level': level})
+		else:
+			metadata_list.append({"source": i['searchable_text_type'], "searchable_text": i['searchable_text'], "filename": filename})
 		
 	collection.add(documents=document_list, embeddings=embedding_list, metadatas=metadata_list, ids=id_list)	
 	try:
@@ -104,7 +107,7 @@ def build_rag_chain_from_text(text, token_name):
 
 ############
 
-def document_search(question, token_name, fragement_num):
+def document_search(question, token_name, fragement_num, level='None'):
 	try:
 		collection = client.get_collection(token_name)
 	except Exception as e:
@@ -114,13 +117,16 @@ def document_search(question, token_name, fragement_num):
 	query_embedding = embedding_function.encode(question).tolist()
 	
 	# Init return 2 fragements
-	fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1)['documents']
+	if level != 'None':
+		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['documents']
+	else:
+		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1)['documents']
 
 	return fragement_candidates
 
 ############
 
-def answer_from_doc(token_name, question):
+def answer_from_doc(token_name, question, level='None'):
 
 	fragement_num = conf.get("fragement", "fragement_num")
 
@@ -128,8 +134,10 @@ def answer_from_doc(token_name, question):
 	for i in conf['llm']:
 		llm_dict[i] = conf['llm'][i]
 	# llm_dict["llm"] = i
-
-	fragement_candidates = document_search(question, token_name, fragement_num)
+	if level != 'None':
+		fragement_candidates = document_search(question, token_name, fragement_num, level)
+	else:
+		fragement_candidates = document_search(question, token_name, fragement_num)
 	logger.info(f"fragement_candidates: {fragement_candidates}")
 
 	if len(fragement_candidates) == 0:

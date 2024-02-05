@@ -151,7 +151,9 @@ template = {
     "text": {
       "type": "object",
       "required": [
-        "text"
+        "text",
+        "filename",
+        "token_name"
       ],
       "properties": {
         "text": {
@@ -165,8 +167,20 @@ template = {
           "items": {
             "type": "string"
           },
+          "example": "example.txt or example"
+        },
+        "token_name": {
+          "items": {
+            "type": "string"
+          },
           "example": "Qh2Xhknhgi8"
         },
+        "level": {
+          "items": {
+            "type": "string"
+          },
+          "example": "level_name(NOT NECESSARY)"
+        }
       }
     },
     "input_text": {
@@ -213,6 +227,12 @@ template = {
           },
           "example": []
         },
+        "level": {
+          "items": {
+            "type": "string"
+          },
+          "example": "level_name(NOT NECESSARY)"
+        }
       }
     },
     "answer": {

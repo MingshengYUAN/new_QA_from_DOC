@@ -72,7 +72,9 @@ def do_empty_collection():
 def doc_input():
     start = time.time()
     data = request.get_json()
-    save_path = os.path.join(save_folder, data['filename']+".txt")
+    if '.txt' not in data['filename']:
+        filename = data['filename']+".txt"
+    save_path = os.path.join(save_folder, data['filename'])
     try:
         with open(save_path, mode='w') as w:
             w.write(data['text'])
@@ -82,7 +84,10 @@ def doc_input():
         logger.info(f"Save text Error: {e}")
 
     # try:
-    rag_chain =  build_rag_chain_from_text(token_name=data['filename'], text=data['text'])
+    if 'level' in data:
+        rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename, level=level)
+    else:
+        rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename)
 
     logger.info(f"Save chromadb status: Save Success")
     logger.info(f"Save name: {data['filename']}")
@@ -123,13 +128,20 @@ def qa_from_doc():
     logger.info(f"Question: {question}")
 
     # try:
-    response, fragment, score, document_name = answer_from_doc(text_name, question)
+    if 'level' in data:
+        response, fragment, score, document_name = answer_from_doc(text_name, question, level)
+    else:
+        response, fragment, score, document_name = answer_from_doc(text_name, question)
     logger.info(f"Question Response: {response}")
     if response == "I don't know" or ("I don't know" in response and len(response) < 17):
         response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
         score = 0.0
     # print(f"{response} | {fragment} | {score} | {document_name}")
-    return {"response": response, "fragment": fragment, "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
+    try:
+        document_name = fragment.split('|___|'[1])
+    except:
+        pass
+    return {"response": response, "fragment": fragment.split('|___|'[0]), "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Answer question Error: {e}")
     #     return {"response": f"Error: {e}", "fragment": "", "status": "Fail!", "running_time": float(time.time() - start)}
