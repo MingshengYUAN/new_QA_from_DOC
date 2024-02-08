@@ -42,6 +42,20 @@ def document_split(
 	# setence to fragements
 	fragments = []
 
+	### FOR FM
+	if 'Introduction' in sentences and 'Summary of Tasks' in sentences:
+		new_doc = nlp(document_content.split('Summary of Tasks')[0])
+		sentences = [s.text for s in new_doc.sentences]
+		summary_text = document_content.split('Summary of Tasks')[1].split('Tasks')[0]
+		fragments.append(f"Summary of Tasks :{summary_text}")
+		tasks = document_content.split('Tasks')[2].split('Legislation, Regulations, and Guidance')[0]
+		for i in tasks.split('\n\n'):
+			if len(i) < 3:
+				continue
+			fragments.append(i)
+		last_part = document_content.split('Legislation, Regulations, and Guidance')[1]
+		fragments.append(last_part)
+
 	start_sentence_idx = 0
 	while(start_sentence_idx+fragment_window_size <= len(sentences)):
 		fragment = sentences[start_sentence_idx:start_sentence_idx+fragment_window_size]

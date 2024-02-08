@@ -75,7 +75,7 @@ def build_rag_chain_from_text(text, token_name, filename, level='None'):
 	# How many times is it mentioned that the person is a developer and designer from the Netherlands?
 	# fragment_question_by_mistral
 	# id0
-	# save_dict = {}
+	save_dict = {}
 	document_list, id_list, embedding_list, metadata_list = [], [], [], []
 	all_num = 0
 	for i in documents_vectores:
@@ -93,12 +93,12 @@ def build_rag_chain_from_text(text, token_name, filename, level='None'):
 		else:
 			metadata_list.append({"source": i['searchable_text_type'], "searchable_text": i['searchable_text'], "filename": filename})
 
-	# 	if i['fragement'] in save_dict and i["searchable_text_type"] != 'sentence':
-	# 		save_dict[i['fragement']].append(i['searchable_text'] + "|__|" + i["searchable_text_type"])
-	# 	else:
-	# 		save_dict[i['fragement']] = [i['searchable_text'] + "|__|" + i["searchable_text_type"]]
-	# with open('./fragement_questions.json', 'w', encoding='utf-8') as file:
-	# 	json.dump(save_dict, file, indent=4)
+		if i['fragement'] in save_dict and i["searchable_text_type"] != 'sentence':
+			save_dict[i['fragement']].append(i['searchable_text'] + "|__|" + i["searchable_text_type"])
+		else:
+			save_dict[i['fragement']] = [i['searchable_text'] + "|__|" + i["searchable_text_type"]]
+	with open('./fragement_questions.json', 'w', encoding='utf-8') as file:
+		json.dump(save_dict, file, indent=4)
 	collection.add(documents=document_list, embeddings=embedding_list, metadatas=metadata_list, ids=id_list)	
 	try:
 		collection = client.get_collection(name="share")

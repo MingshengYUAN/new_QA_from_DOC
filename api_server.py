@@ -40,7 +40,8 @@ console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(fh)
 
-
+idk_threshold = float(conf['threshold']['idk']) if 'threshold' in conf else 0.4
+# print(f"idk_threshold: {idk_threshold}")
 save_folder = 'uploaded'
 
 try:
@@ -138,7 +139,8 @@ def qa_from_doc():
         document_name = fragment.split('|___|')[1].strip('.txt')
     except:
         pass
-    if response == "I don't know" or ("I don't know" in response and len(response) < 17) or score < 0.4:
+    # print(f"Score : {score}")
+    if response == "I don't know" or ("I don't know" in response and len(response) < 17) or score < idk_threshold:
         response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
         score = 0.0
         fragment = ''
