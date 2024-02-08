@@ -262,8 +262,17 @@ def document_split(
 			})
 
 	output = [dict(t) for t in {tuple(d.items()) for d in output}]
+	if conf['application']['name'] == 'the_line':
+		for i in ["What can you do?", "What's your role?"]:
+			tmp_fragement = {'fragement':"""Welcome to THE LINE Intelligence Assistant, your trusted companion in navigating the world of construction safety! I'm here to equip you with valuable insights and information to ensure a secure work environment. From personal protective equipment to safety protocols, best practices, and identifying common hazards on construction sites, I've got you covered. 
+										
+										While I can offer general guidance, please note that I can't provide specific advice for individual situations. In case of a serious safety concern, it's crucial to reach out to your line manager or supervisor promptly.
 
-
+										Let's work together to foster a culture of safety excellence. If you have any questions or need assistance, feel free to ask, and let's build a safer tomorrow!""",
+						'searchable_text': i,
+						'searchable_text_type': 'basic_qa'}
+			output.append(tmp_fragement)
+	
 	return output
 
 ###########
