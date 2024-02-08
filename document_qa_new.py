@@ -1,4 +1,5 @@
 from log_info import logger
+import json
 from utils import Prompter, embedding_function
 from document_embedding import document_split, document_embedding, get_score
 import numpy as np
@@ -49,7 +50,7 @@ def empty_collection(collection_name):
 
 ############
 
-def build_rag_chain_from_text(text, token_name):
+def build_rag_chain_from_text(text, token_name, filename, level='None'):
 	
 	try:
 		client.get_collection(token_name)
@@ -74,7 +75,7 @@ def build_rag_chain_from_text(text, token_name):
 	# How many times is it mentioned that the person is a developer and designer from the Netherlands?
 	# fragment_question_by_mistral
 	# id0
-
+	# save_dict = {}
 	document_list, id_list, embedding_list, metadata_list = [], [], [], []
 	all_num = 0
 	for i in documents_vectores:
@@ -84,11 +85,20 @@ def build_rag_chain_from_text(text, token_name):
 			print(i)
 			all_num+=1
 			continue
-		document_list.append(i['fragement'])
+		document_list.append(i['fragement']+f"|___|{filename}")
 		
 		embedding_list.append(i['searchable_text_embedding'])
-		metadata_list.append({"source": i['searchable_text_type'], "searchable_text": i['searchable_text']})
-		
+		if level != 'None':
+			metadata_list.append({"source": i['searchable_text_type'], "searchable_text": i['searchable_text'], "filename": filename, 'level': level})
+		else:
+			metadata_list.append({"source": i['searchable_text_type'], "searchable_text": i['searchable_text'], "filename": filename})
+
+	# 	if i['fragement'] in save_dict and i["searchable_text_type"] != 'sentence':
+	# 		save_dict[i['fragement']].append(i['searchable_text'] + "|__|" + i["searchable_text_type"])
+	# 	else:
+	# 		save_dict[i['fragement']] = [i['searchable_text'] + "|__|" + i["searchable_text_type"]]
+	# with open('./fragement_questions.json', 'w', encoding='utf-8') as file:
+	# 	json.dump(save_dict, file, indent=4)
 	collection.add(documents=document_list, embeddings=embedding_list, metadatas=metadata_list, ids=id_list)	
 	try:
 		collection = client.get_collection(name="share")
@@ -104,7 +114,7 @@ def build_rag_chain_from_text(text, token_name):
 
 ############
 
-def document_search(question, token_name, fragement_num):
+def document_search(question, token_name, fragement_num, level='None'):
 	try:
 		collection = client.get_collection(token_name)
 	except Exception as e:
@@ -114,13 +124,16 @@ def document_search(question, token_name, fragement_num):
 	query_embedding = embedding_function.encode(question).tolist()
 	
 	# Init return 2 fragements
-	fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1)['documents']
+	if level != 'None':
+		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['documents']
+	else:
+		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1)['documents']
 
 	return fragement_candidates
 
 ############
 
-def answer_from_doc(token_name, question):
+def answer_from_doc(token_name, question, level='None'):
 
 	fragement_num = conf.get("fragement", "fragement_num")
 
@@ -128,8 +141,10 @@ def answer_from_doc(token_name, question):
 	for i in conf['llm']:
 		llm_dict[i] = conf['llm'][i]
 	# llm_dict["llm"] = i
-
-	fragement_candidates = document_search(question, token_name, fragement_num)
+	if level != 'None':
+		fragement_candidates = document_search(question, token_name, fragement_num, level)
+	else:
+		fragement_candidates = document_search(question, token_name, fragement_num)
 	logger.info(f"fragement_candidates: {fragement_candidates}")
 
 	if len(fragement_candidates) == 0:
@@ -141,7 +156,8 @@ def answer_from_doc(token_name, question):
 	prompt = prompter.generate_prompt(question=question, context=fragement_candidates, prompt_serie=conf['prompt']['prompt_serie'])
 
 	response = requests.post(
-			'http://192.168.0.91:3090/generate',
+			# 'http://192.168.0.91:3090/generate',
+			'http://192.168.0.223:3074/generate',
 			json = {'prompt': prompt, 'max_tokens': 512, 'temperature': 0.0, 'stream': False}
 		).json()['response'][0]
 	# print(f"response: {response}")

@@ -89,7 +89,7 @@ def document_split(
 	# for i in tqdm(prompts, desc='1st llm'):
 	response = requests.post(
 		# 'http://192.168.0.91:3090/generate',
-		'http://192.168.0.205:3091/generate',
+		'http://192.168.0.205:3092/generate',   # mistral 7B
 		json = {
 		"prompt":prompts,
 		"stream":False,
@@ -107,12 +107,20 @@ def document_split(
 			'searchable_text':f,
 			'searchable_text_type': 'fragement',
 		})
-		for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
+		for m in q.split('Q:'):
+			if len(m) < 3:
+				continue
 			output.append({
 				'fragement':f,
-				'searchable_text':m.group('question'),
-				'searchable_text_type': 'fragment_question_by_llama_2',
+				'searchable_text':m.replace('\n', ''),
+				'searchable_text_type': 'fragment_question_by_mistral_7B',
 			})
+		# for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
+		# 	output.append({
+		# 		'fragement':f,
+		# 		'searchable_text':m.group('question'),
+		# 		'searchable_text_type': 'fragment_question_by_mistral_7B',
+		# 	})
 
 	##
 
@@ -153,7 +161,8 @@ def document_split(
 		
 	response = requests.post(
 		# 'http://192.168.0.138:3072/generate',
-		'http://192.168.0.205:3092/generate',
+		# 'http://192.168.0.205:3091/generate',
+		'http://192.168.0.178:3090/generate',  # mixtral 8x7B
 
 		json = {
 		"stream":False,
@@ -175,12 +184,21 @@ def document_split(
 			'searchable_text':f,
 			'searchable_text_type': 'fragement',
 		})
-		for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
+		for m in q.split('Q:'):
+			if len(m) < 3:
+				continue
 			output.append({
 				'fragement':f,
-				'searchable_text':m.group('question'),
-				'searchable_text_type': 'fragment_question_by_mistral',
+				'searchable_text':m.replace('\n', ''),
+				'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
 			})
+		# for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
+		# 	output.append({
+		# 		'fragement':f,
+		# 		'searchable_text':m.group('question'),
+		# 		'searchable_text_type': 'fragment_question_by_mistral',
+		# 	})
+
 
 	# responses_1 = []
 	# for i in tqdm(prompts, desc='2nd llm _1'):
