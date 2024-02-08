@@ -126,22 +126,25 @@ def qa_from_doc():
             question += i['content'] + '\n'
     question += new_question
     logger.info(f"Question: {question}")
-
     # try:
-    if 'level' in data:
+    if 'level' in data.keys():
         response, fragment, score, document_name = answer_from_doc(text_name, question, level)
     else:
         response, fragment, score, document_name = answer_from_doc(text_name, question)
     logger.info(f"Question Response: {response}")
-    if response == "I don't know" or ("I don't know" in response and len(response) < 17):
-        response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
-        score = 0.0
+    
     # print(f"{response} | {fragment} | {score} | {document_name}")
     try:
-        document_name = fragment.split('|___|'[1])
+        document_name = fragment.split('|___|')[1].strip('.txt')
     except:
         pass
-    return {"response": response, "fragment": fragment.split('|___|'[0]), "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
+    if response == "I don't know" or ("I don't know" in response and len(response) < 17) or score < 0.4:
+        response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
+        score = 0.0
+        fragment = ''
+        document_name = ''
+    # print(f"Score : {score}")
+    return {"response": response, "fragment": fragment.split('|___|')[0], "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Answer question Error: {e}")
     #     return {"response": f"Error: {e}", "fragment": "", "status": "Fail!", "running_time": float(time.time() - start)}
