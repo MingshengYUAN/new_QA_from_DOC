@@ -134,7 +134,7 @@ def document_search(question, token_name, fragement_num, level='None'):
 		searchable_text.append(i['searchable_text'])
 		if i['source'] == 'basic_qa':
 			basic_qa = 1
-		elif  i['source'] == 'All_tasks'
+		elif i['source'] == 'All_tasks':
 			basic_qa = 2
 		return fragement_candidates, searchable_text, basic_qa
 
