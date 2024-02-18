@@ -163,15 +163,7 @@ def answer_from_doc(token_name, question, level='None'):
 	logger.info(f"context_fragements_len: {len(context_fragements)}")
 
 	if len(context_fragements) > 10000:
-		tmp_response = context_fragements.replace('  ', ' ')
-		response = ''
-		task_num = 1
-		for num, i in enumerate(tmp_response.split('is titled')):
-			if not num:
-				continue
-			tmp_title = i.split(', which is')[0].replace('\n', '')
-			response += f"Task {task_num}:{tmp_title}\n"
-			task_num += 1
+		response = context_fragements.replace('  ', ' ')
 	else:
 		response = requests.post(
 				# 'http://192.168.0.91:3090/generate',
