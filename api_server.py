@@ -139,9 +139,9 @@ def qa_from_doc():
         document_name = fragment.split('|___|')[1].strip('.txt')
     except:
         pass
-    score = 1 - score
     # print(f"Score : {score}")
-    if response == "I don't know" or ("I don't know" in response and len(response) < 17) or score < idk_threshold:
+    # if score:
+    if score and (response == "I don't know" or ("I don't know" in response and len(response) < 17) or score < idk_threshold):
         response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
         score = 0.0
         fragment = ''

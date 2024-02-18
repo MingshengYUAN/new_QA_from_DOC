@@ -36,6 +36,9 @@ def document_split(
 	logger.info("Stanza part finished!")
 	sentences = [s.text for s in doc.sentences]
 
+	# prompts to questions
+	output = []
+
 	## prompts to get questions
 	prompts = []
 
@@ -49,12 +52,19 @@ def document_split(
 		summary_text = document_content.split('Summary of Tasks')[1].split('Tasks')[0]
 		fragments.append(f"Summary of Tasks :{summary_text}")
 		tasks = document_content.split('Tasks')[2].split('Legislation, Regulations, and Guidance')[0]
+		for i in ['Please lists all tasks', 'list all tasks', 'show me all tasks']:
+			output.append({
+				'fragement':tasks,
+				'searchable_text':i,
+				'searchable_text_type': 'All_tasks',
+			})
 		for i in tasks.split('\n\n'):
 			if len(i) < 3:
 				continue
 			fragments.append(i)
-		last_part = document_content.split('Legislation, Regulations, and Guidance')[1]
-		fragments.append(last_part)
+		if 'Legislation, Regulations, and Guidance' in document_content:
+			last_part = document_content.split('Legislation, Regulations, and Guidance')[1]
+			fragments.append(last_part)
 
 	start_sentence_idx = 0
 	while(start_sentence_idx+fragment_window_size <= len(sentences)):
@@ -93,9 +103,6 @@ def document_split(
         """
 		prompts.append(prompt.strip())
 
-	# prompts to questions
-
-	output = []
 
 	## llama-2
 
@@ -272,6 +279,12 @@ def document_split(
 						'searchable_text': i,
 						'searchable_text_type': 'basic_qa'}
 			output.append(tmp_fragement)
+	else:
+		for i in ["What can you do?", "What's your role?"]:
+			tmp_fragement = {'fragement':"""I'am an AI assistant. I can summarize the document you selected and answer the questions you asked.""",
+						'searchable_text': i,
+						'searchable_text_type': 'basic_qa'}
+			output.append(tmp_fragement)
 	
 	return output
 
@@ -296,6 +309,7 @@ def document_embedding(token_name, documents, batch_size = 100):
 	return documents
 
 def get_score(fragements, question):
+	# print(f"Fra: {fragements}, \n Q: {question}")
 	question_embedding = embedding_function.encode(question).tolist()
 	similarity = 0
 	for i in fragements:
@@ -308,9 +322,8 @@ def get_score(fragements, question):
 		except:
 			pass
 		# print(tmp_score)
-
-		similarity += tmp_score
-	return similarity/len(fragements)
+		similarity = max(tmp_score, similarity)
+	return similarity
 
 ###########
 
