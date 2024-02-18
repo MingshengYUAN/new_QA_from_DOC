@@ -107,14 +107,12 @@ def build_rag_chain_from_text(text, token_name, filename, level='None'):
 	# client.get_or_create_collection("share")
 	collection.add(documents=document_list, embeddings=embedding_list, metadatas=metadata_list, ids=id_list)
 
-
-
-
 	return "Success"
 
 ############
 
 def document_search(question, token_name, fragement_num, level='None'):
+	basic_qa = 0
 	try:
 		collection = client.get_collection(token_name)
 	except Exception as e:
@@ -122,15 +120,21 @@ def document_search(question, token_name, fragement_num, level='None'):
 		return "Load colletion error!"
 	
 	query_embedding = embedding_function.encode(question).tolist()
-	
+	searchable_text = []
 	# Init return 2 fragements
 	if level != 'None':
 		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['documents']
+		tmp_searchable_text = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['metadatas'][0]
+		
 	else:
+		print(collection.query(query_embeddings=[query_embedding], n_results=2))
 		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1)['documents']
-
-
-	return fragement_candidates
+		tmp_searchable_text = collection.query(query_embeddings=[query_embedding], n_results=1)['metadatas'][0]
+	for i in tmp_searchable_text:
+		searchable_text.append(i['searchable_text'])
+		if i['source'] == 'basic_qa':
+			basic_qa = 1
+		return fragement_candidates, searchable_text, basic_qa
 
 ############
 
@@ -143,18 +147,19 @@ def answer_from_doc(token_name, question, level='None'):
 		llm_dict[i] = conf['llm'][i]
 	# llm_dict["llm"] = i
 	if level != 'None':
-		fragement_candidates = document_search(question, token_name, fragement_num, level)
+		fragement_candidates, searchable_text, basic_qa = document_search(question, token_name, fragement_num, level)
 	else:
-		fragement_candidates = document_search(question, token_name, fragement_num)
+		fragement_candidates, searchable_text, basic_qa = document_search(question, token_name, fragement_num)
 	logger.info(f"fragement_candidates: {fragement_candidates}")
 
-	if len(fragement_candidates) == 0:
+	if len(searchable_text) == 0:
 		similarity_score = 0.0
 	else:
-
-		similarity_score = get_score(fragement_candidates, question)
-	
-	prompt = prompter.generate_prompt(question=question, context=fragement_candidates, prompt_serie=conf['prompt']['prompt_serie'])
+		similarity_score = get_score(searchable_text, question)
+	context_fragements = ''
+	for i in fragement_candidates[0]:
+		context_fragements += i.split('|___|')[0]
+	prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
 
 	response = requests.post(
 			# 'http://192.168.0.91:3090/generate',
@@ -166,7 +171,10 @@ def answer_from_doc(token_name, question, level='None'):
 		fragement_candidates = fragement_candidates[0][0]
 	except:
 		pass
-	return response, fragement_candidates, similarity_score, ''
+	if basic_qa:
+		return response, '', None, ''
+	else:
+		return response, fragement_candidates, similarity_score, ''
 	
 ############	
 	
