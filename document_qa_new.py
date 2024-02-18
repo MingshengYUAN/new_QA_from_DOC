@@ -160,12 +160,14 @@ def answer_from_doc(token_name, question, level='None'):
 	for i in fragement_candidates[0]:
 		context_fragements += i.split('|___|')[0]
 	prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
-
-	response = requests.post(
-			# 'http://192.168.0.91:3090/generate',
-			'http://192.168.0.223:3074/generate',
-			json = {'prompt': prompt, 'max_tokens': 512, 'temperature': 0.0, 'stream': False}
-		).json()['response'][0]
+	if len(context_fragements) > 30000:
+		response = context_fragements
+	else:
+		response = requests.post(
+				# 'http://192.168.0.91:3090/generate',
+				'http://192.168.0.223:3074/generate',
+				json = {'prompt': prompt, 'max_tokens': 512, 'temperature': 0.0, 'stream': False}
+			).json()['response'][0]
 	# print(f"response: {response}")
 	try:
 		fragement_candidates = fragement_candidates[0][0]
