@@ -134,6 +134,8 @@ def document_search(question, token_name, fragement_num, level='None'):
 		searchable_text.append(i['searchable_text'])
 		if i['source'] == 'basic_qa':
 			basic_qa = 1
+		elif  i['source'] == 'All_tasks'
+			basic_qa = 2
 		return fragement_candidates, searchable_text, basic_qa
 
 ############
@@ -162,7 +164,7 @@ def answer_from_doc(token_name, question, level='None'):
 	prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
 	logger.info(f"context_fragements_len: {len(context_fragements)}")
 
-	if len(context_fragements) > 10000:
+	if len(context_fragements) > 10000 or basic_qa == 2:
 		response = context_fragements.replace('  ', ' ')
 	else:
 		response = requests.post(
@@ -175,7 +177,7 @@ def answer_from_doc(token_name, question, level='None'):
 		fragement_candidates = fragement_candidates[0][0]
 	except:
 		pass
-	if basic_qa:
+	if basic_qa == 1:
 		return response, '', None, ''
 	else:
 		return response, fragement_candidates, similarity_score, ''
