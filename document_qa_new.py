@@ -127,7 +127,7 @@ def document_search(question, token_name, fragement_num, level='None'):
 		tmp_searchable_text = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['metadatas'][0]
 		
 	else:
-		print(collection.query(query_embeddings=[query_embedding], n_results=2))
+		# print(collection.query(query_embeddings=[query_embedding], n_results=2))
 		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1)['documents']
 		tmp_searchable_text = collection.query(query_embeddings=[query_embedding], n_results=1)['metadatas'][0]
 	for i in tmp_searchable_text:
@@ -160,8 +160,18 @@ def answer_from_doc(token_name, question, level='None'):
 	for i in fragement_candidates[0]:
 		context_fragements += i.split('|___|')[0]
 	prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
-	if len(context_fragements) > 30000:
-		response = context_fragements
+	logger.info(f"context_fragements_len: {len(context_fragements)}")
+
+	if len(context_fragements) > 10000:
+		tmp_response = context_fragements.replace('  ', ' ')
+		response = ''
+		task_num = 1
+		for num, i in enumerate(tmp_response.split('is titled')):
+			if not num:
+				continue
+			tmp_title = i.split(', which is')[0].replace('\n', '')
+			response += f"Task {task_num}:{tmp_title}\n"
+			task_num += 1
 	else:
 		response = requests.post(
 				# 'http://192.168.0.91:3090/generate',
