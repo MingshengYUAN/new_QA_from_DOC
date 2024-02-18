@@ -108,34 +108,72 @@ def document_split(
 
 	# responses = []
 	# for i in tqdm(prompts, desc='1st llm'):
-	response = requests.post(
-		# 'http://192.168.0.91:3090/generate',
-		'http://192.168.0.205:3092/generate',   # mistral 7B
-		json = {
-		"prompt":prompts,
-		"stream":False,
-		"max_tokens":max_tokens,
-		"temperature": temperature
-		}
-	)
-		# responses.append(response.json()['response'][0])
-	for f, q in zip(
-		fragments,
-		response.json()['response']
-		):
-		output.append({
-			'fragement':f,
-			'searchable_text':f,
-			'searchable_text_type': 'fragement',
-		})
-		for m in q.split('Q:'):
-			if len(m) < 3:
-				continue
+	if len(prompts)> 41000:
+		stack_num = len(prompts) // 40009
+		for i in range(stack_num):
+			start = i * 40009
+			end = (i + 1) * 40009 if (i+1)!=stack_num else -1
+			response = requests.post(
+			# 'http://192.168.0.138:3072/generate',
+			# 'http://192.168.0.205:3091/generate',
+			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+
+			json = {
+			"stream":False,
+			"prompt":prompts[start:end],
+			"max_tokens":max_tokens,
+			"temperature": temperature
+			}
+		)
+
+		for f, q in zip(
+			fragments,
+			response.json()['response']
+			):
 			output.append({
 				'fragement':f,
-				'searchable_text':m.replace('\n', ''),
-				'searchable_text_type': 'fragment_question_by_mistral_7B',
+				'searchable_text':f,
+				'searchable_text_type': 'fragement',
 			})
+			for m in q.split('Q:'):
+				if len(m) < 3:
+					continue
+				output.append({
+					'fragement':f,
+					'searchable_text':m.replace('\n', ''),
+					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+				})
+	else:
+		response = requests.post(
+			# 'http://192.168.0.138:3072/generate',
+			# 'http://192.168.0.205:3091/generate',
+			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+
+			json = {
+			"stream":False,
+			"prompt":prompts,
+			"max_tokens":max_tokens,
+			"temperature": temperature
+			}
+		)
+
+		for f, q in zip(
+			fragments,
+			response.json()['response']
+			):
+			output.append({
+				'fragement':f,
+				'searchable_text':f,
+				'searchable_text_type': 'fragement',
+			})
+			for m in q.split('Q:'):
+				if len(m) < 3:
+					continue
+				output.append({
+					'fragement':f,
+					'searchable_text':m.replace('\n', ''),
+					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+				})
 		# for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
 		# 	output.append({
 		# 		'fragement':f,
@@ -179,40 +217,72 @@ def document_split(
 	## mistral
 	# responses = []
 	# for i in tqdm(prompts, desc='2nd llm'):
-		
-	response = requests.post(
-		# 'http://192.168.0.138:3072/generate',
-		# 'http://192.168.0.205:3091/generate',
-		'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+	if len(prompts)> 41000:
+		stack_num = len(prompts) // 40009
+		for i in range(stack_num):
+			start = i * 40009
+			end = (i + 1) * 40009 if (i+1)!=stack_num else -1
+			response = requests.post(
+			# 'http://192.168.0.138:3072/generate',
+			# 'http://192.168.0.205:3091/generate',
+			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
 
-		json = {
-		"stream":False,
-		"prompt":prompts,
-		"max_tokens":max_tokens,
-		"temperature": temperature
-		}
-	)
-		
+			json = {
+			"stream":False,
+			"prompt":prompts[start:end],
+			"max_tokens":max_tokens,
+			"temperature": temperature
+			}
+		)
 
-		# responses.append(response.json()['response'][0])
-
-	for f, q in zip(
-		fragments,
-		response.json()['response']
-		):
-		output.append({
-			'fragement':f,
-			'searchable_text':f,
-			'searchable_text_type': 'fragement',
-		})
-		for m in q.split('Q:'):
-			if len(m) < 3:
-				continue
+		for f, q in zip(
+			fragments,
+			response.json()['response']
+			):
 			output.append({
 				'fragement':f,
-				'searchable_text':m.replace('\n', ''),
-				'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+				'searchable_text':f,
+				'searchable_text_type': 'fragement',
 			})
+			for m in q.split('Q:'):
+				if len(m) < 3:
+					continue
+				output.append({
+					'fragement':f,
+					'searchable_text':m.replace('\n', ''),
+					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+				})
+	else:
+		response = requests.post(
+			# 'http://192.168.0.138:3072/generate',
+			# 'http://192.168.0.205:3091/generate',
+			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+
+			json = {
+			"stream":False,
+			"prompt":prompts,
+			"max_tokens":max_tokens,
+			"temperature": temperature
+			}
+		)
+
+		for f, q in zip(
+			fragments,
+			response.json()['response']
+			):
+			output.append({
+				'fragement':f,
+				'searchable_text':f,
+				'searchable_text_type': 'fragement',
+			})
+			for m in q.split('Q:'):
+				if len(m) < 3:
+					continue
+				output.append({
+					'fragement':f,
+					'searchable_text':m.replace('\n', ''),
+					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+				})
 		# for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
 		# 	output.append({
 		# 		'fragement':f,
