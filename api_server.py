@@ -48,7 +48,6 @@ try:
 	os.system(f"mkdir {save_folder}")
 except:
 	pass
-
 try:
 	os.system(f"mkdir {save_folder}/{conf['application']['name']}")
 except:
@@ -92,6 +91,7 @@ def doc_input():
 
     logger.info(f"Save chromadb status: Save Success")
     logger.info(f"Save name: {data['filename']}")
+    logger.info(f"Save unique token name: {data['token_name']}")
     return {"response": 'Save Success', "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Save chromadb Error: {e}")
@@ -135,10 +135,11 @@ def qa_from_doc():
     logger.info(f"Question Response: {response}")
     
     # print(f"{response} | {fragment} | {score} | {document_name}")
-    try:
-        document_name = fragment.split('|___|')[1].strip('.txt')
-    except:
-        pass
+    if document_name == '':
+        try:
+            document_name = fragment.split('|___|')[1].strip('.txt')
+        except:
+            pass
     # print(f"Score : {score}")
     # if score:
     if score and (response == "I don't know" or ("I don't know" in response and len(response) < 17) or score < idk_threshold):
