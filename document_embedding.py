@@ -24,7 +24,7 @@ nlp = stanza.Pipeline('en',processors='tokenize',device = "cuda:0")
 
 def document_split(
 	document_content,
-	fragment_window_size = 5,
+	fragment_window_size = 40,
 	fragment_step_size = 4,
 	sentence_left_context_size = 2,
 	sentence_right_context_size = 5,
@@ -46,18 +46,25 @@ def document_split(
 	fragments = []
 
 	### FOR FM
+
+	output.append({
+				'fragement':document_content,
+				'searchable_text':'',
+				'searchable_text_type': 'All_texts',
+			})
+
 	if 'Introduction' in sentences and 'Summary of Tasks' in sentences:
 		new_doc = nlp(document_content.split('Summary of Tasks')[0])
 		sentences = [s.text for s in new_doc.sentences]
 		summary_text = document_content.split('Summary of Tasks')[1].split('Tasks')[0]
 		fragments.append(f"Summary of Tasks :{summary_text}")
 		tasks = document_content.split('Tasks')[2].split('Legislation, Regulations, and Guidance')[0]
-		for i in ['Please lists all tasks', 'list all tasks', 'show me all tasks']:
-			output.append({
-				'fragement':tasks,
-				'searchable_text':i,
-				'searchable_text_type': 'All_tasks',
-			})
+		# for i in ['Please lists all tasks', 'list all tasks', 'show me all tasks']:
+		# 	output.append({
+		# 		'fragement':tasks,
+		# 		'searchable_text':i,
+		# 		'searchable_text_type': 'All_tasks',
+		# 	})
 		for i in tasks.split('\n\n'):
 			if len(i) < 3:
 				continue
@@ -116,7 +123,9 @@ def document_split(
 			response = requests.post(
 			# 'http://192.168.0.138:3072/generate',
 			# 'http://192.168.0.205:3091/generate',
-			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+			'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
+			# 'http://192.168.0.178:3090/generate',  # mixtral 8x7B 06 8GPUs
+			# 'http://192.168.0.69:3092/generate',  # mixtral 8x7B int4 16 2GPUs
 
 			json = {
 			"stream":False,
@@ -147,7 +156,9 @@ def document_split(
 		response = requests.post(
 			# 'http://192.168.0.138:3072/generate',
 			# 'http://192.168.0.205:3091/generate',
-			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+			'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
+			# 'http://192.168.0.138:3090/generate',  # mixtral 8x7B 06 8GPUs
+			# 'http://192.168.0.69:3092/generate',  # mixtral 8x7B int4 16 2GPUs
 
 			json = {
 			"stream":False,
@@ -225,7 +236,7 @@ def document_split(
 			response = requests.post(
 			# 'http://192.168.0.138:3072/generate',
 			# 'http://192.168.0.205:3091/generate',
-			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+			'http://192.168.0.205:3092/generate',  # mistral 7B
 
 			json = {
 			"stream":False,
@@ -250,13 +261,13 @@ def document_split(
 				output.append({
 					'fragement':f,
 					'searchable_text':m.replace('\n', ''),
-					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+					'searchable_text_type': 'fragment_question_by_mistral_7B',
 				})
 	else:
 		response = requests.post(
 			# 'http://192.168.0.138:3072/generate',
 			# 'http://192.168.0.205:3091/generate',
-			'http://192.168.0.178:3090/generate',  # mixtral 8x7B
+			'http://192.168.0.205:3092/generate',  # mistral 7B batched
 
 			json = {
 			"stream":False,
@@ -281,7 +292,7 @@ def document_split(
 				output.append({
 					'fragement':f,
 					'searchable_text':m.replace('\n', ''),
-					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+					'searchable_text_type': 'fragment_question_by_mistral_7B',
 				})
 		# for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
 		# 	output.append({

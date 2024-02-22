@@ -1,7 +1,13 @@
 import json
 import os.path as osp
+import xlrd
 from typing import Union
 from sentence_transformers import SentenceTransformer
+from share_args import ShareArgs
+from tqdm import tqdm
+import configparser
+conf = configparser.ConfigParser()
+conf.read(ShareArgs.args['config_path'], encoding='utf-8')
     
 embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device="cuda:0")
 
@@ -25,4 +31,27 @@ class Prompter(object):
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
 
+def add_qa_pairs(fragements, filename):
+    filelist = ["THE LINE Adverse Weather Working Plan", "THE LINE - HSW Delivery Plan", "THE LINE - Reward and Recognition Guideline", 
+                "THE LINE - Worker Welfare Plan", "THE LINE Adverse Weather Working Plan", "THE LINE OH&H plan draft", "NEOM-NPR-STD-001_01.00 Projects Health and Safety Assurance Standard_Jan24"]
+    filename = filename.strip('.txt').strip('  ').strip(' ')
+    if filename in filelist:
+        excel_path = f"./qa_pairs/{conf['application']['name']}/{filename}.xlsx"
+        # excel_path = f"./qa_pairs/the_line/{filename}.xlsx"
+    else:
+        return fragements
+    
+    wb = xlrd.open_workbook(excel_path)
+    qa_sheet = wb.sheets()[0]
+    all_rows = qa_sheet.nrows
+    for i in tqdm(range(all_rows), desc='ADD_QA'):
+        if not i:
+            continue
+        tmp_fragement = {'fragement':f"{qa_sheet.cell(i, 0).value}|___|{qa_sheet.cell(i, 2).value}",
+						'searchable_text': qa_sheet.cell(i, 1).value,
+						'searchable_text_type': 'QA_pairs'}
+        fragements.append(tmp_fragement)
+    return fragements
 
+# a = add_qa_pairs([], "THE LINE - Reward and Recognition Guideline")
+# print(a[0])
