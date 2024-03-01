@@ -11,6 +11,7 @@ from log_info import logger
 from numpy.linalg import norm
 import configparser
 from share_args import ShareArgs
+import xlrd
 conf = configparser.ConfigParser()
 conf.read(ShareArgs.args['config_path'], encoding='utf-8')
 
@@ -24,6 +25,7 @@ nlp = stanza.Pipeline('en',processors='tokenize',device = "cuda:0")
 
 def document_split(
 	document_content,
+	filename,
 	fragment_window_size = 40,
 	fragment_step_size = 4,
 	sentence_left_context_size = 2,
@@ -73,13 +75,35 @@ def document_split(
 			last_part = document_content.split('Legislation, Regulations, and Guidance')[1]
 			fragments.append(last_part)
 
-	start_sentence_idx = 0
-	while(start_sentence_idx+fragment_window_size <= len(sentences)):
-		fragment = sentences[start_sentence_idx:start_sentence_idx+fragment_window_size]
-		fragment = ' '.join(fragment)
-		start_sentence_idx += fragment_step_size
-		fragments.append(fragment)
-
+	filelist = ["THE LINE Adverse Weather Working Plan", "THE LINE - HSW Delivery Plan", "THE LINE - Reward and Recognition Guideline", "THE LINE - Fatigue Management Guideline",
+                "THE LINE - Worker Welfare Plan", "THE LINE Adverse Weather Working Plan", "THE LINE OH&H plan draft", "NEOM-NPR-STD-001_01.00 Projects Health and Safety Assurance Standard_Jan24"]
+	filename = filename.strip('.txt').strip('  ').strip(' ')
+	
+	if filename.replace('m-split_', '') in filelist and 'm-split' in filename:
+		filename = filename.replace('m-split_', '')
+		# excel_path = f"./m-split/{conf['application']['name']}/m-split_{filename}.xlsx"
+		excel_path = os.path.join(f"./m-split/{conf['application']['name']}", f"m-split_{filename}.xlsx")
+		try: 
+			wb = xlrd.open_workbook(excel_path)
+			m_split_sheet = wb.sheets()[0]
+			all_rows = m_split_sheet.nrows
+			for i in tqdm(range(all_rows), desc=f"Use m-split"):
+				if not i:
+					continue
+				fragments.append(m_split_sheet.cell(i, 1).value.replace('\n\n', '\n'))
+		except:
+			logger.info(f"M-split {filename} ERROR!")
+			pass
+	elif "line wiki" in filename:
+		fragments.append(document_content)
+	else:
+		start_sentence_idx = 0
+		while(start_sentence_idx+fragment_window_size <= len(sentences)):
+			fragment = sentences[start_sentence_idx:start_sentence_idx+fragment_window_size]
+			fragment = ' '.join(fragment)
+			start_sentence_idx += fragment_step_size
+			fragments.append(fragment)
+	print(f"fragements_len: {len(fragments)}")
 	'''
 	fragment_window_size = 3
 	fragment_step_size = 1
@@ -110,7 +134,7 @@ def document_split(
         """
 		prompts.append(prompt.strip())
 
-
+	print(f"Len: {len(prompts)}")
 	## llama-2
 
 	# responses = []
@@ -330,28 +354,33 @@ def document_split(
 	# 			'searchable_text':m.group('question'),
 	# 			'searchable_text_type': 'fragment_question_by_mistral',
 	# 		})
+	print(f"fragements_len_1: {len(fragments)}")
 
 	### sentences
 	sentence_num  = len(sentences)
-
-	## sentence level question
-	for i in range(sentence_num):
-		sentence = sentences[i]
-		sentence_en = re.sub(r'[^A-z]+', r'', sentence)
-		if len(sentence_en) > 16:
-			start_idx = np.max([0, i-sentence_left_context_size])
-			end_idx = np.min([sentence_num, i+sentence_right_context_size])
-			fragment = sentences[start_idx:end_idx]
-			fragment = ' '.join(fragment)
-			output.append({
-				'fragement':fragment,
-				'searchable_text':sentence,
-				'searchable_text_type': 'sentence',
-			})
+	filelist = ["THE LINE Adverse Weather Working Plan", "THE LINE - HSW Delivery Plan", "THE LINE - Reward and Recognition Guideline", "THE LINE - Fatigue Management Guideline",
+                "THE LINE - Worker Welfare Plan", "THE LINE Adverse Weather Working Plan", "THE LINE OH&H plan draft", "NEOM-NPR-STD-001_01.00 Projects Health and Safety Assurance Standard_Jan24"]
+	filename = filename.strip('.txt').strip('  ').strip(' ').replace('m-split_', '')
+	
+	if filename not in filelist or 'line wiki' in filename:
+		## sentence level question
+		for i in range(sentence_num):
+			sentence = sentences[i]
+			sentence_en = re.sub(r'[^A-z]+', r'', sentence)
+			if len(sentence_en) > 16:
+				start_idx = np.max([0, i-sentence_left_context_size])
+				end_idx = np.min([sentence_num, i+sentence_right_context_size])
+				fragment = sentences[start_idx:end_idx]
+				fragment = ' '.join(fragment)
+				output.append({
+					'fragement':fragment,
+					'searchable_text':sentence,
+					'searchable_text_type': 'sentence',
+				})
 
 	output = [dict(t) for t in {tuple(d.items()) for d in output}]
 	if conf['application']['name'] == 'the_line':
-		for i in ["What can you do?", "What's your role?"]:
+		for i in ["What can you do?", "What's your role?", "Who are you?", "What can you do for me?", "Hi", "Hello"]:
 			tmp_fragement = {'fragement':"""Welcome to THE LINE Intelligence Assistant, your trusted companion in navigating the world of construction safety! I'm here to equip you with valuable insights and information to ensure a secure work environment. From personal protective equipment to safety protocols, best practices, and identifying common hazards on construction sites, I've got you covered. 
 										
 										While I can offer general guidance, please note that I can't provide specific advice for individual situations. In case of a serious safety concern, it's crucial to reach out to your line manager or supervisor promptly.
@@ -366,6 +395,7 @@ def document_split(
 						'searchable_text': i,
 						'searchable_text_type': 'basic_qa'}
 			output.append(tmp_fragement)
+	print(f"fragements_len_2: {len(fragments)}")
 	
 	return output
 

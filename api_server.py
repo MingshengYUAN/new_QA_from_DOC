@@ -117,15 +117,39 @@ def qa_from_doc():
 
     new_question = data['question']
     text_name = data['filename']
+    logger.info(f"File token: {text_name}")
     try:
         history_qa = data['messages']
     except:
         history_qa = []
     question = ''
+    if len(history_qa) > 3:
+        history_qa = history_qa[len(history_qa)-4:-1]
     for i in history_qa:
         if i['role'] == 'user':
             question += i['content'] + '\n'
     question += new_question
+
+    # check QA pairs list
+    # check exist
+    exist_flag = requests.post(
+			'http://192.168.0.16:3020/check_collection_exist',  # mixtral 8x7B 15
+			json = {
+			"application_name":conf['application']['name'],
+			}
+		)
+    if exist_flag:
+        qa_pair_response = requests.post(
+                'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
+                json = {
+                "question":question,
+                "application_name":conf['application']['name'],
+                "threshold_score":0.9,
+                }
+            )
+        if qa_pair_response['response'] != "Score not meet the threshold":
+            return {"response": qa_pair_response['response'], "fragment": '', "score":1.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
+            
     logger.info(f"Question: {question}")
     # try:
     if 'level' in data.keys():
