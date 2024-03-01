@@ -53,16 +53,20 @@ def empty_collection(collection_name):
 def build_rag_chain_from_text(text, token_name, filename, level='None'):
 	
 	try:
-		client.get_collection(token_name)
+		collection = client.get_collection(token_name)
+		num = collection.count()
 		client.delete_collection(token_name)
+		collection = client.get_collection("share")
+		ids_list = [f"{token_name}|__|{i}" for i in range(num)]
+		collection.delete(ids_list)
 	except Exception as e:
 		pass
 	collection = client.create_collection(name=token_name, metadata={"hnsw:space": "cosine"})
 
 	
-	fragements = document_split(text)
+	fragements = document_split(document_content=text, filename=filename)
 	print(conf['application']['name'] in ['test-aramus-qa', 'the_line'])
-	if conf['application']['name'] in ['test-aramus-qa', 'the_line']:
+	if conf['application']['name'] in ['the_line']:
 		fragements = add_qa_pairs(fragements, filename)
 
 	documents_vectores = document_embedding(token_name,fragements)
@@ -103,7 +107,16 @@ def build_rag_chain_from_text(text, token_name, filename, level='None'):
 	# 		save_dict[i['fragement']] = [i['searchable_text'] + "|__|" + i["searchable_text_type"]]
 	# with open('./fragement_questions.json', 'w', encoding='utf-8') as file:
 	# 	json.dump(save_dict, file, indent=4)
-	collection.add(documents=document_list, embeddings=embedding_list, metadatas=metadata_list, ids=id_list)	
+	if len(document_list) > 40000:
+		block = len(document_list) // 40000
+		for i in range(block):
+			start = i * 40000
+			end = (i+1) * 40000
+			collection.add(documents=document_list[start:end], embeddings=embedding_list[start:end], metadatas=metadata_list[start:end], ids=id_list[start:end])
+		collection.add(documents=document_list[block*40000:-1], embeddings=embedding_list[block*40000:-1], metadatas=metadata_list[block*40000:-1], ids=id_list[block*40000:-1])
+	else:
+		collection.add(documents=document_list, embeddings=embedding_list, metadatas=metadata_list, ids=id_list)
+
 	try:
 		collection = client.get_collection(name="share")
 	except:
@@ -153,7 +166,7 @@ def document_search(question, token_name, fragement_num, level='None'):
 			basic_qa = 2
 		elif i['source'] == 'QA_pairs':
 			basic_qa = 3
-	
+	print(f"Document search: {fragement_candidates}, {searchable_text}, {basic_qa}, {other_candidate}")
 	return fragement_candidates, searchable_text, basic_qa, other_candidate
 
 ############
@@ -218,14 +231,20 @@ def answer_from_doc(token_name, question, level='None'):
 	else:
 		prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
 
-	# if basic_qa == 2:
-	# 	response = context_fragements.replace('  ', ' ')
-	# else:
-	response = requests.post(
-			# 'http://192.168.0.91:3072/generate',
-			'http://192.168.0.223:3074/generate',
-			json = {'prompt': prompt, 'max_tokens': 1024, 'temperature': 0.0, 'stream': False}
-		).json()['response'][0]
+	if basic_qa == 1 and similarity_score > 0.8:
+		if "Welcome to THE LINE Intelligence Assistant" in context_fragements:
+			context_fragements = """Hi, I'm THE LINE Intelligence Assistant, your trusted companion in navigating the world of construction safety! I'm here to equip you with valuable insights and information to ensure a secure work environment. From personal protective equipment to safety protocols, best practices, and identifying common hazards on construction sites, I've got you covered.
+ 
+While I can offer general guidance, please note that I can't provide specific advice for individual situations. In case of a serious safety concern, it's crucial to reach out to your line manager or supervisor promptly.
+ 
+Let's work together to foster a culture of safety excellence. If you have any questions or need assistance, feel free to ask, and let's build a safer tomorrow!"""
+		response = context_fragements.replace('  ', ' ')
+	else:
+		response = requests.post(
+				# 'http://192.168.0.91:3072/generate',
+				'http://192.168.0.223:3074/generate',
+				json = {'prompt': prompt, 'max_tokens': 1024, 'temperature': 0.0, 'stream': False}
+			).json()['response'][0]
 	# print(f"response: {response}")
 	
 	try:
