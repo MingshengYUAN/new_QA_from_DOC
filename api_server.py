@@ -13,14 +13,14 @@ from flasgger.utils import swag_from
 from swagger_template import template
 from log_info import *
 from share_args import ShareArgs
-
+from utils import translate_text, check_lang_id
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', default=3010)
 parser.add_argument('--config_path', default='./conf/config_gov.ini')
 args = parser.parse_args()
 args_default = vars(args)
 ShareArgs.update(args_default)
-
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./conf/google_translate_frank.json"
 from document_qa_new import build_rag_chain_from_text, answer_from_doc, empty_collection, del_select_collection
 
 conf = configparser.ConfigParser()
@@ -114,8 +114,12 @@ def qa_from_doc():
     data = request.get_json()
 
     # print(f"data: {data}")
-
+    input_lang = 'en'
     new_question = data['question']
+    if conf['application']['name'] == 'gov' :
+        input_lang = check_lang_id(new_question)
+        if input_lang == 'ar':
+            new_question = translate_text("en", new_question)
     text_name = data['filename']
     logger.info(f"File token: {text_name}")
     try:
@@ -125,10 +129,16 @@ def qa_from_doc():
     question = ''
     if len(history_qa) > 3:
         history_qa = history_qa[len(history_qa)-4:-1]
+    q_num = 0
     for i in history_qa:
         if i['role'] == 'user':
-            question += i['content'] + '\n'
-    question += new_question
+            if check_lang_id(i['content']) == 'ar' and conf['application']['name'] == 'gov':
+                tmp = translate_text('en', i['content'])
+            else:
+                tmp = i['content']
+            question += f"Q{q_num + 1}: "+ tmp + '  '
+            q_num += 1
+    question += "Last question: " + new_question
 
     # check QA pairs list
     # check exist
@@ -161,7 +171,7 @@ def qa_from_doc():
     # print(f"{response} | {fragment} | {score} | {document_name}")
     if document_name == '':
         try:
-            document_name = fragment.split('|___|')[1].strip('.txt')
+            document_name = fragment.split('|___|')[1].replace('.txt', '')
         except:
             pass
     # print(f"Score : {score}")
@@ -172,6 +182,9 @@ def qa_from_doc():
         fragment = ''
         document_name = ''
     # print(f"Score : {score}")
+    if conf['application']['name'] == 'gov' and input_lang == 'ar':
+        response = translate_text('ar', response)
+        fragment = translate_text('ar', fragment)
     return {"response": response, "fragment": fragment.split('|___|')[0], "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Answer question Error: {e}")

@@ -77,8 +77,9 @@ def document_split(
 
 	filelist = ["THE LINE Adverse Weather Working Plan", "THE LINE - HSW Delivery Plan", "THE LINE - Reward and Recognition Guideline", "THE LINE - Fatigue Management Guideline",
                 "THE LINE - Worker Welfare Plan", "THE LINE Adverse Weather Working Plan", "THE LINE OH&H plan draft", "NEOM-NPR-STD-001_01.00 Projects Health and Safety Assurance Standard_Jan24"]
-	filename = filename.strip('.txt').strip('  ').strip(' ')
-	
+
+	filename = filename.replace('.txt', '').strip('  ').strip(' ')
+
 	if filename.replace('m-split_', '') in filelist and 'm-split' in filename:
 		filename = filename.replace('m-split_', '')
 		# excel_path = f"./m-split/{conf['application']['name']}/m-split_{filename}.xlsx"
@@ -96,6 +97,49 @@ def document_split(
 			pass
 	elif "line wiki" in filename:
 		fragments.append(document_content)
+	elif "Most_used" in filename:
+		excel_path = os.path.join(f"./m-split/{conf['application']['name']}", f"{filename}.xlsx")
+		try: 
+			wb = xlrd.open_workbook(excel_path)
+			m_split_sheet = wb.sheets()[0]
+			all_rows = m_split_sheet.nrows
+			for i in tqdm(range(all_rows), desc=f"Use m-split"):
+				if not i:
+					continue
+				fragments.append(m_split_sheet.cell(i, 2).value.replace('\n\n', '\n'))
+		except:
+			logger.info(f"M-split {filename} ERROR!")
+			pass
+	elif "Hajj" in filename or "Family_and" in filename:
+		excel_path = os.path.join(f"./m-split/{conf['application']['name']}", f"{filename}.xlsx")
+		try: 
+			wb = xlrd.open_workbook(excel_path)
+			m_split_sheet = wb.sheets()[0]
+			all_rows = m_split_sheet.nrows
+			exist_file = []
+			for i in tqdm(range(all_rows), desc=f"Use m-split"):
+				if not i:
+					continue
+				title = m_split_sheet.cell(i, 1).value.replace('servicedetails_', '').split('_')[1].strip('.txt')
+				if title in exist_file:
+					continue
+				else:
+					fragments.append(m_split_sheet.cell(i, 2).value.replace('\n\n', '\n'))
+					exist_file.append(title)
+		except:
+			logger.info(f"M-split {filename} ERROR!")
+			pass
+	elif "Test" in filename and conf['application']['name'] == 'gov':
+		file_path = os.path.join(f"./m-split/{conf['application']['name']}", f"{filename}.txt")
+		print(f"{file_path}")
+		tmp_text = ''
+		try:
+			with open(file_path, 'r', encoding='utf-8') as file:
+				for i in file.readlines():
+					tmp_text += i
+			fragments.append(tmp_text)
+		except:
+			pass
 	else:
 		start_sentence_idx = 0
 		while(start_sentence_idx+fragment_window_size <= len(sentences)):
@@ -362,7 +406,7 @@ def document_split(
                 "THE LINE - Worker Welfare Plan", "THE LINE Adverse Weather Working Plan", "THE LINE OH&H plan draft", "NEOM-NPR-STD-001_01.00 Projects Health and Safety Assurance Standard_Jan24"]
 	filename = filename.strip('.txt').strip('  ').strip(' ').replace('m-split_', '')
 	
-	if filename not in filelist or 'line wiki' in filename:
+	if filename not in filelist or 'line wiki' in filename or 'Test' in filename:
 		## sentence level question
 		for i in range(sentence_num):
 			sentence = sentences[i]
