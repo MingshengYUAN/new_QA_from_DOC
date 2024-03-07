@@ -166,7 +166,7 @@ def document_search(question, token_name, fragement_num, level='None'):
 			basic_qa = 2
 		elif i['source'] == 'QA_pairs':
 			basic_qa = 3
-	print(f"Document search: {fragement_candidates}, {searchable_text}, {basic_qa}, {other_candidate}")
+	# print(f"Document search: {fragement_candidates}, {searchable_text}, {basic_qa}, {other_candidate}")
 	return fragement_candidates, searchable_text, basic_qa, other_candidate
 
 ############
@@ -222,10 +222,9 @@ def answer_from_doc(token_name, question, level='None'):
 	except:
 		pass
 
-	if similarity_score < 0.7 and other_candidate != '':
+	if similarity_score < 0.4 and other_candidate != '':
 		prompt = prompter.generate_prompt(question=question, context=other_candidate, prompt_serie=conf['prompt']['prompt_serie'])
-		fragement_candidates = "Summarize from whole document."
-		similarity_score = 1.0
+		fragement_candidates = other_candidate
 		basic_qa = 0
 		logger.info(f"USE ALL TEXTS!")
 	else:
@@ -240,6 +239,7 @@ While I can offer general guidance, please note that I can't provide specific ad
 Let's work together to foster a culture of safety excellence. If you have any questions or need assistance, feel free to ask, and let's build a safer tomorrow!"""
 		response = context_fragements.replace('  ', ' ')
 	else:
+		print(f"--------------{prompt}\n-----------------")
 		response = requests.post(
 				# 'http://192.168.0.91:3072/generate',
 				'http://192.168.0.223:3074/generate',

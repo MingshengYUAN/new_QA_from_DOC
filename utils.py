@@ -5,11 +5,25 @@ from typing import Union
 from sentence_transformers import SentenceTransformer
 from share_args import ShareArgs
 from tqdm import tqdm
+import six
+from google.cloud import translate_v2 as translate
+import langid
 import configparser
 conf = configparser.ConfigParser()
 conf.read(ShareArgs.args['config_path'], encoding='utf-8')
     
 embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device="cuda:0")
+
+#########################
+
+langid.set_languages(['en', 'ar'])
+def check_lang_id(text):
+	if langid.rank(text)[0][0] == 'ar':
+		return 'ar'
+	elif langid.rank(text)[0][0] == 'en':
+		return 'en'
+
+#########################
 
 class Prompter(object):
     __slots__ = ("template", "_verbose")
@@ -59,5 +73,25 @@ def add_qa_pairs(fragements, filename):
         pass
     return fragements
 
-# a = add_qa_pairs([], "THE LINE - Reward and Recognition Guideline")
-# print(a[0])
+#######################  Google translate
+ 
+def translate_text(target, text):
+    """Translates text into the target language.
+    Target must be an ISO 639-1 language code.
+    See https://g.co/cloud/translate/v2/translate-reference#supported_languages
+    """
+   
+ 
+    translate_client = translate.Client()
+ 
+    if isinstance(text, six.binary_type):
+        text = text.decode("utf-8")
+ 
+    # Text can also be a sequence of strings, in which case this method
+    # will return a sequence of results for each text.
+    result = translate_client.translate(text, target_language=target)
+    
+    # print(u"Text: {}".format(result["input"]))
+    # print(u"Translation: {}".format(result["translatedText"]))
+    # print(u"Detected source language:
+    return result["translatedText"]
