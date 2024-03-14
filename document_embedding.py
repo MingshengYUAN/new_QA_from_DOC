@@ -17,7 +17,7 @@ conf.read(ShareArgs.args['config_path'], encoding='utf-8')
 
 torch.backends.cudnn.enabled = False
 
-stanza.download('en')
+#stanza.download('en')
 nlp = stanza.Pipeline('en',processors='tokenize',device = "cuda:0")
 
 

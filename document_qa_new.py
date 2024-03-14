@@ -261,6 +261,7 @@ Let's work together to foster a culture of safety excellence. If you have any qu
         _stream = False
     else:
         print(f"--------------{prompt}\n-----------------")
+
         response = requests.post(
             # 'http://192.168.0.91:3072/generate',
             'http://192.168.0.223:3074/generate',
@@ -272,7 +273,12 @@ Let's work together to foster a culture of safety excellence. If you have any qu
                 "msg_id": msg_id,
                 "id": chat_id,
             }
-        ).json()['response'][0]
+        )
+        content_length = int(response.headers['Content-Length'])
+        if content_length > 0:
+            response = response.json()['response'][0]
+        else:
+            response = ""
     # print(f"response: {response}")
 
     try:
