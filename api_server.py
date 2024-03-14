@@ -135,7 +135,7 @@ def qa_from_doc():
         history_qa = []
 
     # Streaming parameters
-    stream = False if not data.get('stream') else data.get('stream')
+    stream = True if not data.get('stream') else data.get('stream')
     chat_id = 0 if not data.get('id') else data.get('id')
     msg_id = 0 if not data.get('msg_id') else data.get('msg_id')
 
@@ -185,9 +185,22 @@ def qa_from_doc():
     logger.info(f"Question: {question}")
     # try:
     if 'level' in data.keys():
-        response, fragment, score, document_name, _origin, _stream = answer_from_doc(text_name, question, level)
+        response, fragment, score, document_name, _origin, _stream = answer_from_doc(
+            token_name=text_name,
+            question=question,
+            chat_id=chat_id,
+            msg_id=msg_id,
+            stream=stream,
+            level=data.get('level'),
+        )
     else:
-        response, fragment, score, document_name, _origin, _stream = answer_from_doc(text_name, question)
+        response, fragment, score, document_name, _origin, _stream = answer_from_doc(
+            token_name=text_name,
+            question=question,
+            chat_id=chat_id,
+            msg_id=msg_id,
+            stream=stream,
+        )
     logger.info(f"Question Response: {response}")
 
     # print(f"{response} | {fragment} | {score} | {document_name}")

@@ -185,7 +185,7 @@ def document_search(question, token_name, fragement_num, level='None'):
 
 ############
 
-def answer_from_doc(token_name, question, chat_id, msg_id, stream=False, level='None'):
+def answer_from_doc(token_name, question, chat_id, msg_id, stream=True, level='None'):
     fragement_num = conf.get("fragement", "fragement_num")
 
     llm_dict = {}
