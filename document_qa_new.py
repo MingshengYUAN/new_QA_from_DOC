@@ -1,6 +1,6 @@
 from log_info import logger
 import json
-from utils import Prompter, embedding_function, add_qa_pairs
+from utils import Prompter, embedding_function, add_qa_pairs, save_redis
 from document_embedding import document_split, document_embedding, get_score
 import numpy as np
 import chromadb
@@ -50,7 +50,7 @@ def empty_collection(collection_name):
 
 ############
 
-def build_rag_chain_from_text(text, token_name, filename, level='None'):
+def build_rag_chain_from_text(text, token_name, filename, level='None', together=0):
 	
 	try:
 		collection = client.get_collection(token_name)
@@ -142,11 +142,15 @@ def document_search(question, token_name, fragement_num, level='None'):
 	# Init return 2 fragements
 	if level != 'None':
 		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['documents']
-		tmp_searchable_text = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['metadatas'][0]
+		tmp_searchable_text = collection.query(query_embeddings=[query_embedding], n_results=1, where={"level":level})['metadatas'][0]		
 	else:
 		# print(collection.query(query_embeddings=[query_embedding], n_results=1))
 		# {'ids': [['ec814ed9e31f4896878e490cd9efd48b|__|31']], 'distances': [[0.4945688247680664]], 'metadatas': [[{'filename': '05+Traction Lifts.txt', 'searchable_text': ' What is the title of Task 2?', 'source': 'fragment_question_by_mixtral_8x7B'}]], 'embeddings': None, 'documents': [['Task 2 is titled Operational tasks to be carried out in addition to any maintenance or tests carried out by the maintenanceorganisation, which is categorized under  Amber  criticality group. The recommended frequency of performing this task is not Unspecified. Skillset group is  Specialist. Actions required:  A full ascent and descent to assess any changes in the quality of the ride or damage to the equipment.Typical items to be checked to ensure that they are in place, undamaged and functioning correctly are:a) landing doors and bottom door tracks;b) stopping accuracy;c) indicators that are not located in a reserved area;d) landing push controls;e) car push controls;f) door open controls;g) two-way means of communication in the car which provides permanent contact with a rescue service;h) normal car lighting;i) door reversal device;j) safety signs/pictograms. Notes: |___|05+Traction Lifts.txt']], 'uris': None, 'data': None}
 		fragement_candidates = collection.query(query_embeddings=[query_embedding], n_results=1)['documents']
+
+		# retrive directly the fragement 
+		fragement_self_candidates = collection.query(query_embeddings=[query_embedding], n_results=1, where={"source": "fragement"})['documents']
+
 		tmp_searchable_text = collection.query(query_embeddings=[query_embedding], n_results=1)['metadatas'][0]
 		if conf['application']['name'] == 'the_line':
 			tmp_all_tasks = collection.query(query_embeddings=[query_embedding], n_results=1, where={"source": "QA_pairs"})['documents']
@@ -167,11 +171,11 @@ def document_search(question, token_name, fragement_num, level='None'):
 		elif i['source'] == 'QA_pairs':
 			basic_qa = 3
 	# print(f"Document search: {fragement_candidates}, {searchable_text}, {basic_qa}, {other_candidate}")
-	return fragement_candidates, searchable_text, basic_qa, other_candidate
+	return fragement_candidates, searchable_text, basic_qa, other_candidate, fragement_self_candidates
 
 ############
 
-def answer_from_doc(token_name, question, level='None'):
+def answer_from_doc(token_name, question, msg_id, chat_id, condense_question, stream=False, level='None'):
 
 	fragement_num = conf.get("fragement", "fragement_num")
 
@@ -179,10 +183,12 @@ def answer_from_doc(token_name, question, level='None'):
 	for i in conf['llm']:
 		llm_dict[i] = conf['llm'][i]
 	# llm_dict["llm"] = i
+
+	#  Try to use condense question to find the fragment
 	if level != 'None':
-		fragement_candidates, searchable_text, basic_qa, other_candidate = document_search(question, token_name, fragement_num, level)
+		fragement_candidates, searchable_text, basic_qa, other_candidate, fragement_self_candidates = document_search(condense_question, token_name, fragement_num, level)
 	else:
-		fragement_candidates, searchable_text, basic_qa, other_candidate = document_search(question, token_name, fragement_num)
+		fragement_candidates, searchable_text, basic_qa, other_candidate, fragement_self_candidates = document_search(condense_question, token_name, fragement_num)
 	logger.info(f"fragement_candidates: {fragement_candidates}")
 
 	if len(searchable_text) == 0:
@@ -221,14 +227,27 @@ def answer_from_doc(token_name, question, level='None'):
 		filename = fragement_candidates[0][0].split('|___|')[1].strip('.txt')
 	except:
 		pass
-
-	if similarity_score < 0.4 and other_candidate != '':
-		prompt = prompter.generate_prompt(question=question, context=other_candidate, prompt_serie=conf['prompt']['prompt_serie'])
-		fragement_candidates = other_candidate
-		basic_qa = 0
-		logger.info(f"USE ALL TEXTS!")
+	
+	if similarity_score < 0.4:
+		tmp_sim_score = get_score(fragement_self_candidates, question)
+		if tmp_sim_score > 0.4:
+			prompt = prompter.generate_prompt(question=question, context=fragement_self_candidates, prompt_serie=conf['prompt']['prompt_serie'])
+			fragement_candidates = fragement_self_candidates
+			basic_qa = 0
+			logger.info(f"USE RETRIEVE FRAGMENT!")
+		else:
+			prompt = prompter.generate_prompt(question=question, context='', prompt_serie='chat')
 	else:
-		prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
+		prompt = prompter.generate_prompt(question=condense_question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
+
+
+	# if similarity_score < 0.4 and other_candidate != '':
+	# 	prompt = prompter.generate_prompt(question=question, context=other_candidate, prompt_serie=conf['prompt']['prompt_serie'])
+	# 	fragement_candidates = other_candidate
+	# 	basic_qa = 0
+	# 	logger.info(f"USE ALL TEXTS!")
+	# else:
+	# 	prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
 
 	if basic_qa == 1 and similarity_score > 0.8:
 		if "Welcome to THE LINE Intelligence Assistant" in context_fragements:
@@ -238,13 +257,24 @@ While I can offer general guidance, please note that I can't provide specific ad
  
 Let's work together to foster a culture of safety excellence. If you have any questions or need assistance, feel free to ask, and let's build a safer tomorrow!"""
 		response = context_fragements.replace('  ', ' ')
+		save_redis(chat_id, msg_id, response, 0)
+		save_redis(chat_id, msg_id, '', 1)
 	else:
-		print(f"--------------{prompt}\n-----------------")
-		response = requests.post(
-				# 'http://192.168.0.91:3072/generate',
-				'http://192.168.0.223:3074/generate',
-				json = {'prompt': prompt, 'max_tokens': 1024, 'temperature': 0.0, 'stream': False}
-			).json()['response'][0]
+		# print(f"--------------{prompt}\n-----------------")
+		if stream:
+			response = requests.post(
+					# 'http://192.168.0.91:3072/generate',
+					'http://192.168.0.223:3074/generate',
+					json = {'prompt': prompt, 'max_tokens': 1024, 'temperature': 0.0, 'stream': stream, 'msg_id': msg_id, 'id':chat_id, 'application':conf['application']['name']}
+				).status_code
+			if response == 200:
+				response = ''
+		else:
+			response = requests.post(
+					# 'http://192.168.0.91:3072/generate',
+					'http://192.168.0.223:3074/generate',
+					json = {'prompt': prompt, 'max_tokens': 1024, 'temperature': 0.0, 'stream': stream}
+				).json()['response'][0]
 	# print(f"response: {response}")
 	
 	try:

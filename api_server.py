@@ -13,7 +13,7 @@ from flasgger.utils import swag_from
 from swagger_template import template
 from log_info import *
 from share_args import ShareArgs
-from utils import translate_text, check_lang_id
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', default=3010)
 parser.add_argument('--config_path', default='./conf/config_gov.ini')
@@ -21,6 +21,8 @@ args = parser.parse_args()
 args_default = vars(args)
 ShareArgs.update(args_default)
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./conf/google_translate_frank.json"
+
+from utils import translate_text, check_lang_id, save_redis
 from document_qa_new import build_rag_chain_from_text, answer_from_doc, empty_collection, del_select_collection
 
 conf = configparser.ConfigParser()
@@ -113,13 +115,29 @@ def qa_from_doc():
     start = time.time()
     data = request.get_json()
 
-    # print(f"data: {data}")
+    # stream parameter 
+    stream = True if not data.get('stream') else data.get('stream')
+    chat_id = 0 if not data.get('id') else data.get('id')
+    msg_id = 0 if not data.get('msg_id') else data.get('msg_id')
+    logger.info(f"Stream: {stream} | Chat_id: {chat_id} | Msg_id: {msg_id}")
+
+    # Get condense question for retrieve fragment
+    condense_question = ''
+    condense_question_response = requests.post(
+					# 'http://192.168.0.91:3072/generate',
+					'http://localhost:3024/condense_question',
+					json = {"user_input": data['question'], "messages": data['messages']}).json()
+    condense_question = condense_question_response['response']
+    logger.info(f"Condense Question: {condense_question} | Using time: {condense_question_response['running_time']}")
+
+    # For <Gov> translate the arabic to en
     input_lang = 'en'
     new_question = data['question']
     if conf['application']['name'] == 'gov' :
         input_lang = check_lang_id(new_question)
         if input_lang == 'ar':
             new_question = translate_text("en", new_question)
+
     text_name = data['filename']
     logger.info(f"File token: {text_name}")
     try:
@@ -143,14 +161,14 @@ def qa_from_doc():
     # check QA pairs list
     # check exist
     exist_flag = requests.post(
-			'http://192.168.0.16:3020/check_collection_exist',  # mixtral 8x7B 15
+			'http://192.168.0.16:3020/check_collection_exist',
 			json = {
 			"application_name":conf['application']['name'],
 			}
 		)
     if exist_flag:
         qa_pair_response = requests.post(
-                'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
+                'http://192.168.0.178:3090/generate',
                 json = {
                 "question":question,
                 "application_name":conf['application']['name'],
@@ -158,14 +176,16 @@ def qa_from_doc():
                 }
             )
         if qa_pair_response['response'] != "Score not meet the threshold":
-            return {"response": qa_pair_response['response'], "fragment": '', "score":1.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
+            save_redis(chat_id, msg_id, qa_pair_response['response'], 0)
+            save_redis(chat_id, msg_id, '', 1)
+            return {"response":'' , "fragment": '', "score":1.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
             
     logger.info(f"Question: {question}")
     # try:
     if 'level' in data.keys():
-        response, fragment, score, document_name = answer_from_doc(text_name, question, level)
+        response, fragment, score, document_name = answer_from_doc(text_name, question, msg_id, chat_id, condense_question, stream, level)
     else:
-        response, fragment, score, document_name = answer_from_doc(text_name, question)
+        response, fragment, score, document_name = answer_from_doc(text_name, question, msg_id, chat_id, condense_question, stream)
     logger.info(f"Question Response: {response}")
     
     # print(f"{response} | {fragment} | {score} | {document_name}")
@@ -185,6 +205,10 @@ def qa_from_doc():
     if conf['application']['name'] == 'gov' and input_lang == 'ar':
         response = translate_text('ar', response)
         fragment = translate_text('ar', fragment)
+    if len(response) > 5:
+        save_redis(chat_id, msg_id, response, 0)
+        save_redis(chat_id, msg_id, '', 1)
+        response = ''
     return {"response": response, "fragment": fragment.split('|___|')[0], "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Answer question Error: {e}")
