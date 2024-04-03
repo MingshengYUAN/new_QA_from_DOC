@@ -9,9 +9,21 @@ import six
 from google.cloud import translate_v2 as translate
 import langid
 import configparser
+import redis
+
 conf = configparser.ConfigParser()
 conf.read(ShareArgs.args['config_path'], encoding='utf-8')
-    
+
+redis_pool = redis.ConnectionPool(
+    host=str(conf['redis']['host']),
+    port=3379,
+    password='vitonguE@1@1',
+    db=int(conf['redis']['db']),
+    decode_responses=True)
+
+redis_conn = redis.Redis(connection_pool=redis_pool)
+
+
 embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device="cuda:0")
 
 #########################
@@ -95,3 +107,13 @@ def translate_text(target, text):
     # print(u"Translation: {}".format(result["translatedText"]))
     # print(u"Detected source language:
     return result["translatedText"]
+
+def save_redis(chatId, msgId, response, ifend):
+    if ifend:
+        message = {"chatId": chatId,"msgId": msgId, "response": "[\FINAL\]"}
+    else:
+        message = {"chatId": chatId,"msgId": msgId, "response": response}
+    stream_name = f"momrah:sse:chat:{msgId}"
+    message1_id = redis_conn.xadd(stream_name, message)
+    # if ifend:
+    #     redis_conn.expire(stream_name, 3600)

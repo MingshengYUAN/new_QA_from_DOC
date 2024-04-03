@@ -48,7 +48,6 @@ def document_split(
 	fragments = []
 
 	### FOR FM
-
 	output.append({
 				'fragement':document_content,
 				'searchable_text':'',
@@ -75,12 +74,18 @@ def document_split(
 			last_part = document_content.split('Legislation, Regulations, and Guidance')[1]
 			fragments.append(last_part)
 
+	## For the line
 	filelist = ["THE LINE Adverse Weather Working Plan", "THE LINE - HSW Delivery Plan", "THE LINE - Reward and Recognition Guideline", "THE LINE - Fatigue Management Guideline",
                 "THE LINE - Worker Welfare Plan", "THE LINE Adverse Weather Working Plan", "THE LINE OH&H plan draft", "NEOM-NPR-STD-001_01.00 Projects Health and Safety Assurance Standard_Jan24"]
-
+	# filelist = []
+	for i in os.listdir('./m-split/the_line/new_knowledge_share'):
+		filelist.append(i.replace('.txt', '').strip(' '))
+	
 	filename = filename.replace('.txt', '').strip('  ').strip(' ')
 
 	if filename.replace('m-split_', '') in filelist and 'm-split' in filename:
+		logger.info(f"THE LINE OLD FILE USE EXIST FILE: {filename}!")
+
 		filename = filename.replace('m-split_', '')
 		# excel_path = f"./m-split/{conf['application']['name']}/m-split_{filename}.xlsx"
 		excel_path = os.path.join(f"./m-split/{conf['application']['name']}", f"m-split_{filename}.xlsx")
@@ -95,6 +100,16 @@ def document_split(
 		except:
 			logger.info(f"M-split {filename} ERROR!")
 			pass
+	elif filename in filelist and conf['application']['name'] in ['the_line', 'aramus-qa']:
+		logger.info(f"Knowledge share USE EXIST FILE: {filename}!")
+		filepath = f"./m-split/the_line/new_knowledge_share/{filename}.txt"
+		with open(filepath, 'r', encoding='utf-8') as file:
+			new_document_content = file.read()
+		if '[/SPLIT]' not in new_document_content:
+			fragments.append(new_document_content)
+		else:
+			for j in new_document_content.split('[/SPLIT]'):
+				fragments.append(j)
 	elif "line wiki" in filename:
 		fragments.append(document_content)
 	elif "Most_used" in filename:
@@ -142,11 +157,17 @@ def document_split(
 			pass
 	else:
 		start_sentence_idx = 0
-		while(start_sentence_idx+fragment_window_size <= len(sentences)):
-			fragment = sentences[start_sentence_idx:start_sentence_idx+fragment_window_size]
+		print(f"Sentence len : {len(sentences)}")
+		for i in tqdm(range(len(sentences)//fragment_step_size)):
+		# while(start_sentence_idx+fragment_window_size <= len(sentences)):
+			start_idx = i * fragment_step_size
+			end_idx = i * fragment_step_size + fragment_window_size
+			fragment = sentences[start_idx:end_idx]
 			fragment = ' '.join(fragment)
-			start_sentence_idx += fragment_step_size
 			fragments.append(fragment)
+		fragment = sentences[len(sentences)//fragment_window_size * fragment_step_size:-1]
+		fragment = ' '.join(fragment)
+		fragments.append(fragment)
 	print(f"fragements_len: {len(fragments)}")
 	'''
 	fragment_window_size = 3
@@ -189,8 +210,6 @@ def document_split(
 			start = i * 40009
 			end = (i + 1) * 40009 if (i+1)!=stack_num else -1
 			response = requests.post(
-			# 'http://192.168.0.138:3072/generate',
-			# 'http://192.168.0.205:3091/generate',
 			'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
 			# 'http://192.168.0.178:3090/generate',  # mixtral 8x7B 06 8GPUs
 			# 'http://192.168.0.69:3092/generate',  # mixtral 8x7B int4 16 2GPUs
@@ -222,8 +241,6 @@ def document_split(
 				})
 	else:
 		response = requests.post(
-			# 'http://192.168.0.138:3072/generate',
-			# 'http://192.168.0.205:3091/generate',
 			'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
 			# 'http://192.168.0.138:3090/generate',  # mixtral 8x7B 06 8GPUs
 			# 'http://192.168.0.69:3092/generate',  # mixtral 8x7B int4 16 2GPUs
