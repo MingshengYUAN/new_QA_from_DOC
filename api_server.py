@@ -13,6 +13,9 @@ from flasgger.utils import swag_from
 from swagger_template import template
 from log_info import *
 from share_args import ShareArgs
+from concurrent.futures import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', default=3010)
@@ -22,7 +25,7 @@ args_default = vars(args)
 ShareArgs.update(args_default)
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./conf/google_translate_frank.json"
 
-from utils import translate_text, check_lang_id, save_redis
+from utils import translate_text, check_lang_id, save_redis, redis_conn
 from document_qa_new import build_rag_chain_from_text, answer_from_doc, empty_collection, del_select_collection
 
 conf = configparser.ConfigParser()
@@ -70,34 +73,49 @@ def do_empty_collection():
 
 #####################
 
+def exec_doc_input(data):
+    # File upload status : START
+    stream_name = f"file_upload_status"
+    try:
+        if '.txt' not in data['filename']:
+            filename = data['filename']+".txt"
+        save_path = os.path.join(save_folder, data['filename'])
+        try:
+            with open(save_path, mode='w') as w:
+                w.write(data['text'])
+            logger.info(f"Save text status: Save Success")
+            logger.info(f"Save path: {save_path}")
+        except Exception as e:
+            logger.info(f"Save text Error: {e}")
+
+        # try:
+        if 'level' in data:
+            rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename, level=level)
+        else:
+            rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename)
+
+        # File upload status : Success
+        message1_id = redis_conn.xadd(stream_name, {"token_name":data['token_name'], "status":'Success'})
+        
+        logger.info(f"Save chromadb status: Save Success")
+        logger.info(f"Save name: {data['filename']}")
+        logger.info(f"Save unique token name: {data['token_name']}")
+
+    except Exception as e:
+        # File upload status : Fail
+        message1_id = redis_conn.xadd(stream_name, {"token_name":data['token_name'], "status":'Fail'})
+
+
+        logger.info(f"Save chromadb Error: {e}")
+
+
 @app.route("/doc_input", methods=['POST'])
 def doc_input():
     start = time.time()
     data = request.get_json()
-    if '.txt' not in data['filename']:
-        filename = data['filename']+".txt"
-    save_path = os.path.join(save_folder, data['filename'])
-    try:
-        with open(save_path, mode='w') as w:
-            w.write(data['text'])
-        logger.info(f"Save text status: Save Success")
-        logger.info(f"Save path: {save_path}")
-    except Exception as e:
-        logger.info(f"Save text Error: {e}")
+    executor.submit(exec_doc_input, data=data)
+    return {"response": "Start processing", "status": "Start", "running_time": float(time.time() - start)}
 
-    # try:
-    if 'level' in data:
-        rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename, level=level)
-    else:
-        rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename)
-
-    logger.info(f"Save chromadb status: Save Success")
-    logger.info(f"Save name: {data['filename']}")
-    logger.info(f"Save unique token name: {data['token_name']}")
-    return {"response": 'Save Success', "status": "Success!", "running_time": float(time.time() - start)}
-    # except Exception as e:
-    #     logger.info(f"Save chromadb Error: {e}")
-    #     return {"response": "Save Error!", "status": "Fail!", "running_time": float(time.time() - start)}
 
 ###########################
 
