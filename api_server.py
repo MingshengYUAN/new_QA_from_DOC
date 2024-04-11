@@ -139,6 +139,11 @@ def qa_from_doc():
     msg_id = 0 if not data.get('msg_id') else data.get('msg_id')
     logger.info(f"Stream: {stream} | Chat_id: {chat_id} | Msg_id: {msg_id}")
 
+    # FAQ, QA from DOC switches
+    use_FAQ = True if not data.get('use_FAQ') else data.get('use_FAQ')
+    use_QA_from_DOC = True if not data.get('use_QA_from_DOC') else data.get('use_QA_from_DOC')
+
+
     # Get condense question for retrieve fragment
     condense_question = ''
     condense_question_response = requests.post(
@@ -162,7 +167,7 @@ def qa_from_doc():
         history_qa = data['messages']
     except:
         history_qa = []
-    question = ''
+    gather_question = ''
     if len(history_qa) > 3:
         history_qa = history_qa[len(history_qa)-4:-1]
     q_num = 0
@@ -172,38 +177,44 @@ def qa_from_doc():
                 tmp = translate_text('en', i['content'])
             else:
                 tmp = i['content']
-            question += f"Q{q_num + 1}: "+ tmp + '  '
+            gather_question += f"Q{q_num + 1}: "+ tmp + '  '
             q_num += 1
-    question += "Last question: " + new_question
+    gather_question += "Last question: " + new_question
+
 
     # check QA pairs list
     # check exist
-    exist_flag = requests.post(
-			'http://192.168.0.16:3020/check_collection_exist',
-			json = {
-			"application_name":conf['application']['name'],
-			}
-		)
-    if exist_flag:
-        qa_pair_response = requests.post(
-                'http://192.168.0.178:3090/generate',
+    if use_FAQ:
+        exist_flag = requests.post(
+                'http://192.168.0.16:3020/check_collection_exist',
                 json = {
-                "question":question,
                 "application_name":conf['application']['name'],
-                "threshold_score":0.9,
                 }
             )
-        if qa_pair_response['response'] != "Score not meet the threshold":
-            save_redis(chat_id, msg_id, qa_pair_response['response'], 0)
-            save_redis(chat_id, msg_id, '', 1)
-            return {"response":'' , "fragment": '', "score":1.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
+        if exist_flag:
+            qa_pair_response = requests.post(
+                    'http://192.168.0.178:3090/generate',
+                    json = {
+                    "question":question,
+                    "application_name":conf['application']['name'],
+                    "threshold_score":0.9,
+                    }
+                )
+            if qa_pair_response['response'] != "Score not meet the threshold":
+                save_redis(chat_id, msg_id, qa_pair_response['response'], 0)
+                save_redis(chat_id, msg_id, '', 1)
+                return {"response":'' , "fragment": '', "score":1.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
             
-    logger.info(f"Question: {question}")
+    logger.info(f"Question: {new_question}")
     # try:
     if 'level' in data.keys():
-        response, fragment, score, document_name = answer_from_doc(text_name, question, msg_id, chat_id, condense_question, stream, level)
+        response, fragment, score, document_name = answer_from_doc(token_name=text_name, question=gather_question, original_question=new_question,
+                                                                    msg_id=msg_id, chat_id=chat_id, condense_question=condense_question, 
+                                                                    messages=history_qa, stream=stream, level=level)
     else:
-        response, fragment, score, document_name = answer_from_doc(text_name, question, msg_id, chat_id, condense_question, stream)
+        response, fragment, score, document_name = answer_from_doc(token_name=text_name, question=gather_question, original_question=new_question,
+                                                                    msg_id=msg_id, chat_id=chat_id, condense_question=condense_question,
+                                                                    stream=stream, messages=history_qa)
     logger.info(f"Question Response: {response}")
     
     # print(f"{response} | {fragment} | {score} | {document_name}")
@@ -227,6 +238,7 @@ def qa_from_doc():
         save_redis(chat_id, msg_id, response, 0)
         save_redis(chat_id, msg_id, '', 1)
         response = ''
+    
     return {"response": response, "fragment": fragment.split('|___|')[0], "score":score, "document_name": document_name , "status": "Success!", "running_time": float(time.time() - start)}
     # except Exception as e:
     #     logger.info(f"Answer question Error: {e}")

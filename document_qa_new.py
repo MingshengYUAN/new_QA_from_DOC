@@ -175,7 +175,7 @@ def document_search(question, token_name, fragement_num, level='None'):
 
 ############
 
-def answer_from_doc(token_name, question, msg_id, chat_id, condense_question, stream=False, level='None'):
+def answer_from_doc(token_name, question, msg_id, chat_id, condense_question, messages, original_question, stream=False, level='None'):
 
 	fragement_num = conf.get("fragement", "fragement_num")
 
@@ -228,17 +228,66 @@ def answer_from_doc(token_name, question, msg_id, chat_id, condense_question, st
 	except:
 		pass
 	
-	if similarity_score < 0.4:
+	if similarity_score < 0.4 and len(fragement_self_candidates[0]) != 0:
 		tmp_sim_score = get_score(fragement_self_candidates, question)
 		if tmp_sim_score > 0.4:
-			prompt = prompter.generate_prompt(question=question, context=fragement_self_candidates, prompt_serie=conf['prompt']['prompt_serie'])
+			prompt = prompter.generate_prompt_with_answer(question=question, context=fragement_self_candidates, answer='', prompt_serie=conf['prompt']['prompt_serie'])
 			fragement_candidates = fragement_self_candidates
 			basic_qa = 0
 			logger.info(f"USE RETRIEVE FRAGMENT!")
 		else:
 			prompt = prompter.generate_prompt(question=question, context='', prompt_serie='chat')
 	else:
-		prompt = prompter.generate_prompt(question=condense_question, context=context_fragements, prompt_serie=conf['prompt']['prompt_serie'])
+		prompt = prompter.generate_prompt_with_answer(question=condense_question, context=context_fragements, answer='', prompt_serie=conf['prompt']['prompt_serie'])
+
+	### New form of prompt ###
+
+	gather_prompt = ''
+	if len(messages) == 0:
+		prompt = prompter.generate_prompt_with_answer(question=question, context=context_fragements, answer='', prompt_serie='rag-prompt')
+		gather_prompt += prompt
+	else:
+		user_former_input, assistant_former_answer = '', ''
+		for num, i in enumerate(messages):
+			if i['role'] == 'user':
+				user_former_input = i['content']
+			else:
+				assistant_former_answer = i['content']
+			if user_former_input != '' and assistant_former_answer !='':
+				## 1st round with system prompt
+				if num - 1 == 0:
+					prompt = prompter.generate_prompt_with_answer(question=user_former_input, context='', answer=assistant_former_answer, prompt_serie='rag-prompt')
+					gather_prompt += prompt
+				## After 1st round no system prompt needed, just question + context + 'Answer:'
+				else:
+					prompt = prompter.generate_prompt_with_answer(question=user_former_input, context='', answer=assistant_former_answer, prompt_serie='rag-prompt-2nd')
+					gather_prompt += prompt
+				user_former_input, assistant_former_answer = '', ''
+			## Add final symbol '<\s>' if ended or add '\n' 
+			if num == len(messages) - 1:
+				gather_prompt += '<\s>'
+			else:
+				gather_prompt += '\n'
+
+		## if sim_score >= 0.4, accept current fragment, add the new prompt
+		if similarity_score >= 0.4:
+			prompt = prompter.generate_prompt_with_answer(question=original_question, context=context_fragements, answer='', prompt_serie='rag-prompt-2nd')
+			gather_prompt += prompt
+		else:
+		## sim_score < 0.4, use rerank fragment, and determine the rerank fragment sim_score, if < 0.4 again, go into the chat prompt(Directly give the question without context to the LLM)
+			
+			tmp_sim_score = get_score(fragement_self_candidates, original_question) if len(fragement_self_candidates[0]) != 0 else 0.0
+			if tmp_sim_score > 0.4:
+				prompt = prompter.generate_prompt_with_answer(question=original_question, context=fragement_self_candidates, answer='', prompt_serie='rag-prompt-2nd')
+				fragement_candidates = fragement_self_candidates
+				basic_qa = 0
+				logger.info(f"USE RETRIEVE FRAGMENT!")
+			else:
+				prompt = prompter.generate_prompt_with_answer(question=original_question, context='', answer='', prompt_serie='chat')
+			gather_prompt += prompt
+
+
+	### Pre-develop code for OpenAI form APIs at bottom  ###
 
 
 	# if similarity_score < 0.4 and other_candidate != '':
@@ -284,8 +333,34 @@ Let's work together to foster a culture of safety excellence. If you have any qu
 	if basic_qa == 1:
 		return response, '', None, ''
 	else:
+		if not fragement_candidates[0]:
+			fragement_candidates = ''
 		return response, fragement_candidates, similarity_score, filename
 	
 ############	
 	
 
+# Pre-develop for OpenAI form APIs
+
+	# llm_messages = []
+	# if len(messages) == 0:
+	# 	prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie='rag-prompt-standard-1st')
+	# 	llm_messages.append({"role": "user", "content":prompt})
+	# else:
+	# 	for num, i in enumerate(messages):
+	# 		if not num or (num == len(messages) - 1 and similarity_score >= 0.4):
+	# 			prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie='rag-prompt-standard-1st')
+	# 			llm_messages.append({"role": "user", "content":prompt})
+	# 		elif num == len(messages) - 1 and num and similarity_score < 0.4:
+	# 			tmp_sim_score = get_score(fragement_self_candidates, question)
+	# 			if tmp_sim_score > 0.4:
+	# 				prompt = prompter.generate_prompt(question=question, context=fragement_self_candidates, prompt_serie='rag-prompt-standard-2nd')
+	# 				fragement_candidates = fragement_self_candidates
+	# 				basic_qa = 0
+	# 				logger.info(f"USE RETRIEVE FRAGMENT!")
+	# 			else:
+	# 				prompt = prompter.generate_prompt(question=question, context='', prompt_serie='chat_standard')
+	# 			llm_messages.append({"role": "user", "content":prompt})
+	# 		else:
+	# 			prompt = prompter.generate_prompt(question=question, context=context_fragements, prompt_serie='rag-prompt-standard-2nd')
+	# 			llm_messages.append({"role": "user", "content":prompt})

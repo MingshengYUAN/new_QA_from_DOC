@@ -53,6 +53,13 @@ class Prompter(object):
         # if a label (=response, =output) is provided, it's also appended.
         res = self.template[prompt_serie].format(question=question, context=context)
         return res
+    
+    def generate_prompt_with_answer(self, question: str, context: str, answer: str, prompt_serie) -> str:
+        # returns the full prompt from instruction and optional input
+        # if a label (=response, =output) is provided, it's also appended.
+        res = self.template[prompt_serie].format(question=question, context=context, answer=answer)
+        return res
+
 
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
