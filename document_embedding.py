@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import requests
 import stanza
-from utils import embedding_function
+from utils import embedding_function, bge_m3_embedding_function
 import torch
 from tqdm import tqdm
 from log_info import logger
@@ -12,6 +12,12 @@ from numpy.linalg import norm
 import configparser
 from share_args import ShareArgs
 import xlrd
+from obs import GetObjectHeader
+from obs import ObsClient
+import traceback
+from io import StringIO
+import csv
+
 conf = configparser.ConfigParser()
 conf.read(ShareArgs.args['config_path'], encoding='utf-8')
 
@@ -19,6 +25,12 @@ torch.backends.cudnn.enabled = False
 
 stanza.download('en')
 nlp = stanza.Pipeline('en',processors='tokenize',device = "cuda:0")
+
+ak = "UERNBNVSGD0C638VBTY5"
+sk = "7jVUYOwxvZEoRNtoo0Oq6uLwfXBTuxT8BBpeBqon"
+bucketName = "aramus-llm"
+server = "http://obs.me-east-212.managedcognitivecloud.com"
+obsClient = ObsClient(access_key_id=ak, secret_access_key=sk, server=server)
 
 
 ###########
@@ -30,13 +42,24 @@ def document_split(
 	fragment_step_size = 4,
 	sentence_left_context_size = 2,
 	sentence_right_context_size = 5,
+	file_type = 'None',
+	file_path = 'None',
 	):
 	max_tokens = int(conf.get("llm", "max_tokens"))
 	temperature = float(conf.get("llm", "temperature"))
-
-	doc = nlp(document_content)
-	logger.info("Stanza part finished!")
-	sentences = [s.text for s in doc.sentences]
+	if file_type == 'None':
+		doc = nlp(document_content)
+		logger.info("Stanza part finished!")
+		sentences = [s.text for s in doc.sentences]
+	elif file_type == 'pdf':
+		sentence = []
+		data = obsClient.getObject(bucketName, file_path, loadStreamInMemory=True).body.buffer
+		data_io = StringIO(data.decode('utf-8'))
+		csv_reader = csv.reader(data_io)
+		for i in csv_reader:
+			if i[1] != 'None':
+				sentence.append(i[1]+'\n'+i[2])
+		logger.info("PDF analyse finished!")
 
 	# prompts to questions
 	output = []
@@ -83,7 +106,7 @@ def document_split(
 	
 	filename = filename.replace('.txt', '').strip('  ').strip(' ')
 
-	if filename.replace('m-split_', '') in filelist and 'm-split' in filename:
+	if filename.replace('m-split_', '') in filelist and 'THE LINE' in filename or 'NEOM-NPR' in filename:
 		logger.info(f"THE LINE OLD FILE USE EXIST FILE: {filename}!")
 
 		filename = filename.replace('m-split_', '')
@@ -100,7 +123,7 @@ def document_split(
 		except:
 			logger.info(f"M-split {filename} ERROR!")
 			pass
-	elif filename in filelist and conf['application']['name'] in ['the_line', 'aramus-qa']:
+	elif filename in filelist and conf['application']['name'] in ['the_line', 'test-aramus-qa']:
 		logger.info(f"Knowledge share USE EXIST FILE: {filename}!")
 		filepath = f"./m-split/the_line/new_knowledge_share/{filename}.txt"
 		with open(filepath, 'r', encoding='utf-8') as file:
@@ -210,65 +233,57 @@ def document_split(
 			start = i * 40009
 			end = (i + 1) * 40009 if (i+1)!=stack_num else -1
 			response = requests.post(
-			'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
-			# 'http://192.168.0.178:3090/generate',  # mixtral 8x7B 06 8GPUs
-			# 'http://192.168.0.69:3092/generate',  # mixtral 8x7B int4 16 2GPUs
-
-			json = {
-			"stream":False,
-			"prompt":prompts[start:end],
-			"max_tokens":max_tokens,
-			"temperature": temperature
-			}
-		)
+			'http://192.168.0.69:3070/v1/completions',   
+			json = {'prompt': prompts[start:end], 
+					"model": "../../../Meta-Llama-3-70B-Instruct-hf/", 
+					"max_tokens": max_tokens, 
+					"stream": False, 
+					"temperature": temperature,
+					"stop_token_ids": [128009]})
 
 		for f, q in zip(
 			fragments,
-			response.json()['response']
+			response.json()['choices']
 			):
 			output.append({
 				'fragement':f,
 				'searchable_text':f,
 				'searchable_text_type': 'fragement',
 			})
-			for m in q.split('Q:'):
+			for m in q['text'].split('Q:'):
 				if len(m) < 3:
 					continue
 				output.append({
 					'fragement':f,
 					'searchable_text':m.replace('\n', ''),
-					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+					'searchable_text_type': 'fragment_question_by_llama3_70B',
 				})
 	else:
 		response = requests.post(
-			'http://192.168.0.178:3090/generate',  # mixtral 8x7B 15
-			# 'http://192.168.0.138:3090/generate',  # mixtral 8x7B 06 8GPUs
-			# 'http://192.168.0.69:3092/generate',  # mixtral 8x7B int4 16 2GPUs
-
-			json = {
-			"stream":False,
-			"prompt":prompts,
-			"max_tokens":max_tokens,
-			"temperature": temperature
-			}
-		)
-
+			'http://192.168.0.69:3070/v1/completions',   
+			json = {'prompt': prompts, 
+					"model": "../../../Meta-Llama-3-70B-Instruct-hf/", 
+					"max_tokens": max_tokens, 
+					"stream": False, 
+					"temperature": temperature,
+					"stop_token_ids": [128009]})
+					
 		for f, q in zip(
 			fragments,
-			response.json()['response']
+			response.json()['choices']
 			):
 			output.append({
 				'fragement':f,
 				'searchable_text':f,
 				'searchable_text_type': 'fragement',
 			})
-			for m in q.split('Q:'):
+			for m in q['text'].split('Q:'):
 				if len(m) < 3:
 					continue
 				output.append({
 					'fragement':f,
 					'searchable_text':m.replace('\n', ''),
-					'searchable_text_type': 'fragment_question_by_mixtral_8x7B',
+					'searchable_text_type': 'fragment_question_by_llama3_70B',
 				})
 		# for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
 		# 	output.append({
@@ -319,65 +334,55 @@ def document_split(
 			start = i * 40009
 			end = (i + 1) * 40009 if (i+1)!=stack_num else -1
 			response = requests.post(
-			# 'http://192.168.0.138:3072/generate',
-			# 'http://192.168.0.205:3091/generate',
-			'http://192.168.0.205:3092/generate',  # mistral 7B
-
-			json = {
-			"stream":False,
-			"prompt":prompts[start:end],
-			"max_tokens":max_tokens,
-			"temperature": temperature
-			}
-		)
+			'http://192.168.0.75:3090/v1/completions',   
+			json = {'prompt': prompts[start:end], 
+					"model": "../../../../Mixtral-8x22B-Instruct-v0.1-AWQ", 
+					"max_tokens": max_tokens, 
+					"stream": False, 
+					"temperature": temperature})
 
 		for f, q in zip(
 			fragments,
-			response.json()['response']
+			response.json()['choices']
 			):
 			output.append({
 				'fragement':f,
 				'searchable_text':f,
 				'searchable_text_type': 'fragement',
 			})
-			for m in q.split('Q:'):
+			for m in q['text'].split('\n'):
 				if len(m) < 3:
 					continue
 				output.append({
 					'fragement':f,
 					'searchable_text':m.replace('\n', ''),
-					'searchable_text_type': 'fragment_question_by_mistral_7B',
+					'searchable_text_type': 'fragment_question_by_mistral_8x22B',
 				})
 	else:
 		response = requests.post(
-			# 'http://192.168.0.138:3072/generate',
-			# 'http://192.168.0.205:3091/generate',
-			'http://192.168.0.205:3092/generate',  # mistral 7B batched
-
-			json = {
-			"stream":False,
-			"prompt":prompts,
-			"max_tokens":max_tokens,
-			"temperature": temperature
-			}
-		)
+			'http://192.168.0.75:3090/v1/completions',   
+			json = {'prompt': prompts, 
+					"model": "../../../../Mixtral-8x22B-Instruct-v0.1-AWQ", 
+					"max_tokens": max_tokens, 
+					"stream": False, 
+					"temperature": temperature})
 
 		for f, q in zip(
 			fragments,
-			response.json()['response']
+			response.json()['choices']
 			):
 			output.append({
 				'fragement':f,
 				'searchable_text':f,
 				'searchable_text_type': 'fragement',
 			})
-			for m in q.split('Q:'):
+			for m in q['text'].split('\n'):
 				if len(m) < 3:
 					continue
 				output.append({
 					'fragement':f,
 					'searchable_text':m.replace('\n', ''),
-					'searchable_text_type': 'fragment_question_by_mistral_7B',
+					'searchable_text_type': 'fragment_question_by_mistral_8x22B',
 				})
 		# for m in re.finditer(r'Q:\s*(?P<question>[^\n].*?)(\n|$)', q):
 		# 	output.append({
@@ -472,10 +477,11 @@ def document_embedding(token_name, documents, batch_size = 100):
 	texts = []
 	for i in tqdm(documents):
 		texts.append(i['searchable_text'])
-	embedding_vectors = embedding_function.encode(texts).tolist()
+	embedding_vectors = bge_m3_embedding_function(texts).json()
+	# embedding_vectors = embedding_function.encode(texts).tolist()
 	for r in documents:
 		r['searchable_text_embedding'] = embedding_vectors[j]
-		r['id'] = token_name + "|__|" + str(j)
+		r['id'] = token_name + "|__|" + str(hash(str([r['searchable_text'], r['fragement']])))
 		j += 1
 
 	return documents

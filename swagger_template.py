@@ -175,6 +175,18 @@ template = {
           },
           "example": "Qh2Xhknhgi8"
         },
+        "file_path": {
+          "items": {
+            "type": "string"
+          },
+          "example": "The path of the processed file on OBS (Not necessary, if no, use old upload way <put all texts in text> )"
+        },
+        "file_type": {
+          "items": {
+            "type": "string"
+          },
+          "example": "The type of the upload file(Options: pdf, excel, word)"
+        },
         "level": {
           "items": {
             "type": "string"
@@ -221,9 +233,21 @@ template = {
           },
           "example": "Qh2Xhknhgi8"
         },
+        "use_FAQ": {
+          "items": {
+            "type": "boolean"
+          },
+          "example": True,
+        },
+        "use_QA_from_DOC": {
+          "items": {
+            "type": "boolean"
+          },
+          "example": True,
+        },
         "messages": {
           "items": {
-            "type": "list"
+            "type": "array"
           },
           "example": []
         },
@@ -242,7 +266,7 @@ template = {
           "items": {
             "type": "string"
           },
-          "example": "Visual pollution is ......"
+          "example": "if go Workflow will be '' else will be 'Visual pollution is ......'"
         },
         "fragment": {
           "items": {
@@ -250,9 +274,21 @@ template = {
           },
           "example": "Doc: Visual pollution is ......"
         },
+        "messages": {
+          "items": {
+            "type": "array"
+          },
+          "example": [{'role':'user', 'content':'xxxxxxx'}, {'role': 'assistant', 'content': 'xxxxxxxx'}]
+        },
+        "LLMArgs": {
+          "items": {
+            "type": "array"
+          },
+          "example": {'stream': True, 'temperature': 0.0, 'max_tokens': 1024}
+        },
         "score": {
           "items": {
-            "type": "float"
+            "type": "number"
           },
           "example": 0.897364564
         },
