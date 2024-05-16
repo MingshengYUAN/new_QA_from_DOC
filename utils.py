@@ -10,6 +10,12 @@ from google.cloud import translate_v2 as translate
 import langid
 import configparser
 import redis
+import numpy as np
+import time
+from FlagEmbedding import FlagReranker, BGEM3FlagModel
+from log_info import logger
+import requests
+
 
 conf = configparser.ConfigParser()
 conf.read(ShareArgs.args['config_path'], encoding='utf-8')
@@ -23,8 +29,37 @@ redis_pool = redis.ConnectionPool(
 
 redis_conn = redis.Redis(connection_pool=redis_pool)
 
+# bge_m3_embedding_function = SentenceTransformer('BAAI/bge-m3', device="cuda:0")
+embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2")
+# reranker = FlagReranker('BAAI/bge-reranker-v2-m3')
+# reranker = FlagReranker('BAAI/bge-reranker-v2-m3', use_fp16=True)
+# embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device="cuda:0")
+# bge_m3_embedding_function = BGEM3FlagModel('BAAI/bge-m3', use_fp16=True)
 
-embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2", device="cuda:0")
+#########################
+
+def retrieve_top_fragment(fragement_candidates, question, top_k=1):
+    tmp_res = requests.post('http://192.168.0.151:3090/retrieve_top_fragment', json={"fragement_candidates":fragement_candidates,"question":question, "top_k":top_k}).json()
+    retrieve_use_time = tmp_res['retrieve_use_time']
+    res = tmp_res['res']
+    top_index = tmp_res['top_index']
+    logger.info(f"Retrieve use time: {retrieve_use_time}")
+    return res, top_index
+
+def bge_m3_embedding_function(texts):
+    embedding_vectors = requests.post('http://192.168.0.151:3090/bge_m3_embedding', json={"texts":texts})
+    return embedding_vectors
+
+# def retrieve_top_fragment(fragement_candidates, question, top_k=1):
+#     retrieve_start = time.time()
+#     fragement_question_pairs = [[i[0], question] for i in fragement_candidates]
+#     print(f"fragement_question_pairs: {fragement_question_pairs}")
+#     scores = reranker.compute_score(fragement_question_pairs, normalize=True)
+#     top_index = np.argsort(-np.array(scores))
+#     res = [fragement_candidates[top_index[i]] for i in range(top_k)]
+#     retrieve_use_time = time.time() - retrieve_start
+#     logger.info(f"Retrieve use time: {retrieve_use_time}")
+#     return res
 
 #########################
 
@@ -124,3 +159,55 @@ def save_redis(chatId, msgId, response, ifend):
     message1_id = redis_conn.xadd(stream_name, message)
     # if ifend:
     #     redis_conn.expire(stream_name, 3600)
+
+def create_mixtral_messages_prompt(messages, question):
+    prompter = Prompter('./prompt.json')
+    final_prompt = ''
+    if len(messages) == 0:
+        prompt = '<s> [INST] ' + prompter.generate_prompt_with_answer(question=question, context='', answer='', prompt_serie='chat_standard') + '[/INST]'
+        final_prompt += prompt
+    else:
+        user_former_input, assistant_former_answer = '', ''
+        for num, i in enumerate(messages):
+            if i['role'] == 'user':
+                user_former_input = i['content']
+            else:
+                assistant_former_answer = i['content']
+            if user_former_input != '' and assistant_former_answer !='':
+                ## 1st round with system prompt
+                if num - 1 == 0:
+                    prompt = '<s> [INST] ' + prompter.generate_prompt_with_answer(question=user_former_input, context='', answer=assistant_former_answer, prompt_serie='chat_standard') + '[/INST]'
+                    final_prompt += prompt
+                ## After 1st round no system prompt needed, just question + context + 'Answer:'
+                else:
+                    prompt = '[INST]' + prompter.generate_prompt_with_answer(question=user_former_input, context='', answer=assistant_former_answer, prompt_serie='chat_standard') + '[/INST]'
+                    final_prompt += prompt
+                user_former_input, assistant_former_answer = '', ''
+                ## Add final symbol '<\s>' if ended or add '\n' 
+            if num == len(messages) - 1:
+                final_prompt += '<\s>'
+            else:
+                final_prompt += '\n'
+        prompt = prompter.generate_prompt_with_answer(question=question, context='', answer='', prompt_serie='chat')
+        final_prompt += prompt
+    return final_prompt
+
+
+def create_mixtral_messages(messages, question):
+    prompter = Prompter('./prompt.json')
+    llm_messages = []
+    if len(messages) == 0:
+        prompt = prompter.generate_prompt(question=question, context='', prompt_serie='chat_standard')
+        llm_messages.append({"role": "user", "content":prompt})
+    else:
+        for num, i in enumerate(messages):
+            if i['role'] == 'user':
+                user_former_input = i['content']
+            else:
+                assistant_former_answer = i['content']
+            if num % 2:
+                prompt = prompter.generate_prompt(question=user_former_input, context='', prompt_serie='chat_standard')
+                llm_messages.append({"role": "user", "content":prompt})
+    llm_messages.append({"role": "assistant", "content":assistant_former_answer})
+
+    return llm_messages
