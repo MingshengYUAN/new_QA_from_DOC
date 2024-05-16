@@ -78,8 +78,8 @@ def document_split(
 	filelist = ["THE LINE Adverse Weather Working Plan", "THE LINE - HSW Delivery Plan", "THE LINE - Reward and Recognition Guideline", "THE LINE - Fatigue Management Guideline",
                 "THE LINE - Worker Welfare Plan", "THE LINE Adverse Weather Working Plan", "THE LINE OH&H plan draft", "NEOM-NPR-STD-001_01.00 Projects Health and Safety Assurance Standard_Jan24"]
 	# filelist = []
-	for i in os.listdir('./m-split/the_line/new_knowledge_share'):
-		filelist.append(i.replace('.txt', '').strip(' '))
+	# for i in os.listdir('./m-split/the_line/new_knowledge_share'):
+	# 	filelist.append(i.replace('.txt', '').strip(' '))
 	
 	filename = filename.replace('.txt', '').strip('  ').strip(' ')
 
