@@ -32,7 +32,7 @@ server = "obs://aramus-llm/aramus-qa/upload/default/"
 bucketName="examplebucket"
 obsClient = ObsClient(access_key_id=ak, secret_access_key=sk, server=server)
 
-executor = ThreadPoolExecutor()
+executor = ThreadPoolExecutor(max_workers=20)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', default=3010)
@@ -92,37 +92,37 @@ def do_empty_collection():
 def exec_doc_input(data):
     # File upload status : START
     stream_name = f"file_upload_status"
+    # try:
+    if '.txt' not in data['filename']:
+        filename = data['filename']+".txt"
+    save_path = os.path.join(save_folder, data['filename'])
     try:
-        if '.txt' not in data['filename']:
-            filename = data['filename']+".txt"
-        save_path = os.path.join(save_folder, data['filename'])
-        try:
-            # data['text'] is the file_path in the OBS
-            with open(save_path, mode='w') as w:
-                w.write(data['text'])
-            logger.info(f"Save text status: Save Success")
-            logger.info(f"Save OBS path: {save_path}")
-        except Exception as e:
-            logger.info(f"Save text Error: {e}")
-
-        if 'level' in data:
-            rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename, level=level, file_path = data['file_path'], file_type = data['file_type'])
-        else:
-            rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename, file_path = data['file_path'], file_type = data['file_type'])
-
-        # File upload status : Success
-        message1_id = redis_conn.xadd(stream_name, {"token_name":data['token_name'], "status":'Success'})
-        
-        logger.info(f"Save chromadb status: Save Success")
-        logger.info(f"Save name: {data['filename']}")
-        logger.info(f"Save unique token name: {data['token_name']}")
-
+        # data['text'] is the file_path in the OBS
+        with open(save_path, mode='w') as w:
+            w.write(data['text'])
+        logger.info(f"Save text status: Save Success")
+        logger.info(f"Save OBS path: {save_path}")
     except Exception as e:
-        # File upload status : Fail
-        message1_id = redis_conn.xadd(stream_name, {"token_name":data['token_name'], "status":'Fail'})
+        logger.info(f"Save text Error: {e}")
+
+    if 'level' in data:
+        rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename, level=level, file_path = data['file_path'] if 'file_path' in data.keys() else 'None', file_type = data['file_type'] if 'file_type' in data.keys() else 'None')
+    else:
+        rag_chain =  build_rag_chain_from_text(token_name=data['token_name'], text=data['text'], filename = filename, file_path = data['file_path'] if 'file_path' in data.keys() else 'None', file_type = data['file_type'] if 'file_type' in data.keys() else 'None')
+
+    # File upload status : Success
+    message1_id = redis_conn.xadd(stream_name, {"token_name":data['token_name'], "status":'Success'})
+    
+    logger.info(f"Save chromadb status: Save Success")
+    logger.info(f"Save name: {data['filename']}")
+    logger.info(f"Save unique token name: {data['token_name']}")
+
+    # except Exception as e:
+    #     # File upload status : Fail
+    #     message1_id = redis_conn.xadd(stream_name, {"token_name":data['token_name'], "status":'Fail'})
 
 
-        logger.info(f"Save chromadb Error: {e}")
+    #     logger.info(f"Save chromadb Error: {e}")
 
 
 @app.route("/doc_input", methods=['POST'])
@@ -148,7 +148,6 @@ def doc_delete():
 def qa_from_doc():
     start = time.time()
     data = request.get_json()
-    print(f"messages: {data['messages']}")
     try:
         history_qa = data['messages']
     except:
@@ -169,7 +168,7 @@ def qa_from_doc():
         condense_messages = copy.deepcopy(history_qa)
         condense_messages.insert(0, {"role":"system", "content": "Do NOT answer the question. Accroding to the chat history, simply reformulate the latest question if needed or just return itself."})
     condense_messages.append({"role":"user", "content":new_question})
-    print(f"condense_messages: !!!! {condense_messages} !!!!!!")
+    # print(f"condense_messages: !!!! {condense_messages} !!!!!!")
 			
     response = requests.post(
         'http://192.168.0.69:3070/v1/chat/completions',   
@@ -196,25 +195,26 @@ def qa_from_doc():
 
     #     return {"response":response.choices[0].message.content , "fragment": '', "score":0.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
 
-    # Get condense question for retrieve fragment
-    condense_question = ''
-    condense_question_response = requests.post(
-					# 'http://192.168.0.91:3072/generate',
-					'http://localhost:3024/condense_question',
-					json = {"user_input": data['question'], "messages": data['messages']}).json()
-    condense_question = condense_question_response['response']
-    logger.info(f"Condense Question: {condense_question} | Using time: {condense_question_response['running_time']}")
+    # Get condense question for retrieve fragment -- Xiaohui
+    # condense_question = ''
+    # condense_question_response = requests.post(
+	# 				# 'http://192.168.0.91:3072/generate',
+	# 				'http://localhost:3024/condense_question',
+	# 				json = {"user_input": data['question'], "messages": data['messages']}).json()
+    # condense_question = condense_question_response['response']
+
+    logger.info(f"Condense Question: {condense_question}")
 
     # For <Gov> translate the arabic to en
     input_lang = 'en'
     
-    if conf['application']['name'] == 'gov' :
-        input_lang = check_lang_id(new_question)
-        if input_lang == 'ar':
-            new_question = translate_text("en", new_question)
+    # if conf['application']['name'] == 'gov' :
+    #     input_lang = check_lang_id(new_question)
+    #     if input_lang == 'ar':
+    #         new_question = translate_text("en", new_question)
 
     text_name = data['filename']
-    logger.info(f"File token: {text_name}")
+    logger.info(f"File token name: {text_name}")
     
     gather_question = ''
     if len(history_qa) > 3:
@@ -256,14 +256,17 @@ def qa_from_doc():
             
     logger.info(f"Question: {new_question}")
     # try:
+    pre_prompt = '' if not data.get('pre_prompt') else data.get('pre_prompt')
+    logger.info(f"pre_prompt: {pre_prompt}")
+
     if use_QA_from_DOC:
         if 'level' in data.keys() and data['level']:
             response, fragment, score, document_name, llm_messages = answer_from_doc(token_name=text_name, gather_question=gather_question, question=new_question,
-                                                                        msg_id=msg_id, chat_id=chat_id, condense_question=condense_question, 
+                                                                        msg_id=msg_id, chat_id=chat_id, condense_question=condense_question, pre_prompt=pre_prompt,
                                                                         messages=history_qa, stream=stream, level=data['level'])
         else:
             response, fragment, score, document_name, llm_messages = answer_from_doc(token_name=text_name, gather_question=gather_question, question=new_question,
-                                                                        msg_id=msg_id, chat_id=chat_id, condense_question=condense_question,
+                                                                        msg_id=msg_id, chat_id=chat_id, condense_question=condense_question, pre_prompt=pre_prompt,
                                                                         stream=stream, messages=history_qa)
         logger.info(f"Response mode: {response}")
         
@@ -288,11 +291,13 @@ def qa_from_doc():
         #     fragment = ''
         #     document_name = ''
 
-        
+        ### !!! ###
         # Gov translation part : NEED TO BE TRANSRORMED TO OPENAI FORM RETURN
-        if conf['application']['name'] == 'gov' and input_lang == 'ar':
-            response = translate_text('ar', response)
-            fragment = translate_text('ar', fragment)
+        # if conf['application']['name'] == 'gov' and input_lang == 'ar':
+        #     response = translate_text('ar', response)
+        #     fragment = translate_text('ar', fragment)
+
+
         # if len(response) > 5:
         #     save_redis(chat_id, msg_id, response, 0)
         #     save_redis(chat_id, msg_id, '', 1)

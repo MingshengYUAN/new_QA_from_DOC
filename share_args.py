@@ -29,7 +29,7 @@ class LLMArgs():
     args = {
         "stream": True,
         "temperature": 0.0,
-        "max_tokens": 1024
+        "max_tokens": 2048
     }
 
     def get_args():  # get para dict

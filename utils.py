@@ -15,6 +15,7 @@ import time
 from FlagEmbedding import FlagReranker, BGEM3FlagModel
 from log_info import logger
 import requests
+import numpy as np
 
 
 conf = configparser.ConfigParser()
@@ -38,13 +39,47 @@ embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2")
 
 #########################
 
+def llm_relative_determine(fragement_candidates, question):
+    if isinstance(fragement_candidates[0], list):
+        fragement_candidates = fragement_candidates[0]
+    logger.info(f"llm_relative_determine: {fragement_candidates}")
+
+    fragement_candidates_res = []
+    for i in fragement_candidates:
+        messages = [{"role":"system", "content": """You are a grader assessing relevance of a retrieved document to a user question. \n 
+    If the document contains keyword(s) or semantic meaning related to the user question, grade it as relevant. \n
+    It does not need to be a stringent test. The goal is to filter out erroneous retrievals. \n
+    Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question. Do not give the reason."""},
+                    {"role":"user", "content":f"{i} \n\nUser question: {question}"}]
+        response = requests.post(
+	'http://192.168.0.69:3070/v1/chat/completions',   
+	    json = {'messages': messages, "model": "../../../Meta-Llama-3-70B-Instruct-hf/", "max_tokens": 32, "stream": False, "temperature": 0.0, "stop_token_ids": [128009]}).json()
+        try:
+            res = response['choices'][0]['message']['content']
+            if res == 'yes' or 'yes' in res:
+                logger.info(f"YES!")
+                fragement_candidates_res.append(i)
+            else:
+                logger.info(f"Question: {question} \nUnrelated Fragment: {res}")
+        except:
+            logger.info(f"Determine ERROR: {response}")
+            continue
+    return fragement_candidates_res
+
+
 def retrieve_top_fragment(fragement_candidates, question, top_k=1):
-    tmp_res = requests.post('http://192.168.0.151:3090/retrieve_top_fragment', json={"fragement_candidates":fragement_candidates,"question":question, "top_k":top_k}).json()
+    # print(f"fragement_candidates:{fragement_candidates},question:{question}, top_k:{top_k}")
+    if isinstance(fragement_candidates[0], str):
+        fragement_candidates = [fragement_candidates]
+    
+    tmp_res = requests.post('http://192.168.0.151:3090/retrieve_top_fragment', json={"fragement_candidates":fragement_candidates[0],"question":question, "top_k":top_k}).json()
     retrieve_use_time = tmp_res['retrieve_use_time']
+    
     res = tmp_res['res']
     top_index = tmp_res['top_index']
+    top_score = tmp_res['top_score']
     logger.info(f"Retrieve use time: {retrieve_use_time}")
-    return res, top_index
+    return res, top_index, top_score
 
 def bge_m3_embedding_function(texts):
     embedding_vectors = requests.post('http://192.168.0.151:3090/bge_m3_embedding', json={"texts":texts})
@@ -208,6 +243,6 @@ def create_mixtral_messages(messages, question):
             if num % 2:
                 prompt = prompter.generate_prompt(question=user_former_input, context='', prompt_serie='chat_standard')
                 llm_messages.append({"role": "user", "content":prompt})
-    llm_messages.append({"role": "assistant", "content":assistant_former_answer})
+        llm_messages.append({"role": "assistant", "content":assistant_former_answer})
 
     return llm_messages

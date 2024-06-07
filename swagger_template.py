@@ -233,6 +233,12 @@ template = {
           },
           "example": "Qh2Xhknhgi8"
         },
+        "pre_prompt": {
+          "items": {
+            "type": "string"
+          },
+          "example": "I'm an AI assistant....."
+        },
         "use_FAQ": {
           "items": {
             "type": "boolean"
