@@ -286,7 +286,7 @@ def answer_from_doc(token_name, question, msg_id, chat_id, condense_question, me
 	if isinstance(fragement_candidates[0], list):
 		fragement_candidates = fragement_candidates[0]
 	for i in fragement_candidates:
-		context_fragements += i.split('|___|')[0]
+		context_fragements += i.split('|___|')[0] + '\n'
 	logger.info(f"context_fragements_len: {len(context_fragements)}")
 
 	# use all info
@@ -300,7 +300,7 @@ def answer_from_doc(token_name, question, msg_id, chat_id, condense_question, me
 		else:
 			filename = ''
 			for i in fragement_candidates:
-				filename += i.split('|___|')[1].strip('.txt') + '  '
+				filename += i.split('|___|')[1].strip('.txt') + '  &  '
 	except:
 		pass
 
