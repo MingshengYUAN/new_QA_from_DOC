@@ -23,8 +23,11 @@ pip install -r requirments.txt
 
 #### Deployment
 ##### Start command
+
+```
 python api_server.py --port <port_num> --config_path <config_path> 
 eg: python api_server.py --port 3011 --config_path './conf/config_test_aramus_qa.ini'
+```
 
 ## Repository Organization
 
