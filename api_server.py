@@ -179,39 +179,7 @@ def qa_from_doc():
     use_FAQ = True if not data.get('use_FAQ') else data.get('use_FAQ')
     use_QA_from_DOC = True if not data.get('use_QA_from_DOC') else data.get('use_QA_from_DOC')
 
-    # GPT4V parameter
-    
-    # image_input = 0 if not data.get('image_input') else data.get('image_input')
-    # image_qa = 0
-    # for i in history_qa:
-    #     if type(i['content']) is not str:
-    #         image_qa = 1
-    # if image_input or image_qa:
-    #     images_messages = history_qa.append({"role": "user", "content": new_question})
-    #     payload = {"model": "gpt-4-vision-preview",
-    #                 "messages": images_messages,
-    #                 "max_tokens": 1024}
-    #     response = requests.post("https://gpt.datapipe.top/v1/chta/completions", headers = headers, json=payload)
-
-    #     return {"response":response.choices[0].message.content , "fragment": '', "score":0.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
-
-    # Get condense question for retrieve fragment -- Xiaohui
-    # condense_question = ''
-    # condense_question_response = requests.post(
-	# 				# 'http://192.168.0.91:3072/generate',
-	# 				'http://localhost:3024/condense_question',
-	# 				json = {"user_input": data['question'], "messages": data['messages']}).json()
-    # condense_question = condense_question_response['response']
-
     logger.info(f"Condense Question: {condense_question}")
-
-    # For <Gov> translate the arabic to en
-    input_lang = 'en'
-    
-    # if conf['application']['name'] == 'gov' :
-    #     input_lang = check_lang_id(new_question)
-    #     if input_lang == 'ar':
-    #         new_question = translate_text("en", new_question)
 
     text_name = data['filename']
     logger.info(f"File token name: {text_name}")
@@ -255,12 +223,13 @@ def qa_from_doc():
                 return {"response":'' , "fragment": '', "score":1.0, "document_name": '' , "status": "Success!", "running_time": float(time.time() - start)}
             
     logger.info(f"Question: {new_question}")
-    # try:
+
     pre_prompt = '' if not data.get('pre_prompt') else data.get('pre_prompt')
     logger.info(f"pre_prompt: {pre_prompt}")
 
     if use_QA_from_DOC:
         if 'level' in data.keys() and data['level']:
+            # Get response
             response, fragment, score, document_name, llm_messages = answer_from_doc(token_name=text_name, gather_question=gather_question, question=new_question,
                                                                         msg_id=msg_id, chat_id=chat_id, condense_question=condense_question, pre_prompt=pre_prompt,
                                                                         messages=history_qa, stream=stream, level=data['level'])
@@ -269,15 +238,13 @@ def qa_from_doc():
                                                                         msg_id=msg_id, chat_id=chat_id, condense_question=condense_question, pre_prompt=pre_prompt,
                                                                         stream=stream, messages=history_qa)
         logger.info(f"Response mode: {response}")
-        
-        
-        # print(f"{response} | {fragment} | {score} | {document_name}")
+
         if document_name == '':
             try:
                 document_name = fragment.split('|___|')[1].replace('.txt', '')
             except:
                 pass
-
+        # Normal generate mode if score < threshold
         if score and score < idk_threshold:
             response = "Workflow" 
             messages = create_mixtral_messages(history_qa, new_question)
@@ -285,38 +252,15 @@ def qa_from_doc():
             fragment = ''
             document_name = ''
 
-        # if score and (response == "I don't know" or ("I don't know" in response and len(response) < 17) or score < idk_threshold):
-        #     response = "I’m sorry I currently do not have an answer to that question, please rephrase or ask me another question." 
-        #     score = 0.0
-        #     fragment = ''
-        #     document_name = ''
-
-        ### !!! ###
-        # Gov translation part : NEED TO BE TRANSRORMED TO OPENAI FORM RETURN
-        # if conf['application']['name'] == 'gov' and input_lang == 'ar':
-        #     response = translate_text('ar', response)
-        #     fragment = translate_text('ar', fragment)
-
-
-        # if len(response) > 5:
-        #     save_redis(chat_id, msg_id, response, 0)
-        #     save_redis(chat_id, msg_id, '', 1)
-        #     response = ''
         llm_args = LLMArgs.args
         if response != 'Workflow':
+            # For redis form LLM QA generate, current not use
             return {"response": response, "fragment": fragment.split('|___|')[0], "score":score, "document_name": document_name , "messages": [], "llm_args": {}, "status": "Success!", "running_time": float(time.time() - start)}
         else:
             return {"response": '', "fragment": fragment.split('|___|')[0], "score":score, "document_name": document_name , "messages": llm_messages, "llm_args": llm_args, "status": "Success!", "running_time": float(time.time() - start)}
 
     else:
         messages = create_mixtral_messages(history_qa, new_question)
-        # response = requests.post(
-		# 			# 'http://192.168.0.91:3072/generate',
-		# 			'http://192.168.0.223:3074/generate',
-		# 			json = {'prompt': prompt, 'max_tokens': 1024, 'temperature': 0.0, 'stream': stream, 'msg_id': msg_id, 'id':chat_id, 'application':conf['application']['name']}
-		# 		).status_code
-        # if response == 200:
-        #     response = ''
         return {"response": '', "fragment": '', "score":0.0, "document_name": '' , "messages": llm_messages, "llm_args": llm_args, "status": "Success!", "running_time": float(time.time() - start)}
 
 
