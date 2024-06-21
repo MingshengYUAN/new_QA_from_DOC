@@ -39,6 +39,7 @@ embedding_function = SentenceTransformer(model_name_or_path="all-mpnet-base-v2")
 
 #########################
 
+# Agent service to determine if the fragment include the answer for question
 def llm_relative_determine(fragement_candidates, question):
     if isinstance(fragement_candidates[0], list):
         fragement_candidates = fragement_candidates[0]
@@ -66,7 +67,7 @@ def llm_relative_determine(fragement_candidates, question):
             continue
     return fragement_candidates_res
 
-
+# Reranker API, can be set in this project if the cuda version has been updated 
 def retrieve_top_fragment(fragement_candidates, question, top_k=1):
     # print(f"fragement_candidates:{fragement_candidates},question:{question}, top_k:{top_k}")
     if isinstance(fragement_candidates[0], str):
@@ -81,6 +82,7 @@ def retrieve_top_fragment(fragement_candidates, question, top_k=1):
     logger.info(f"Retrieve use time: {retrieve_use_time}")
     return res, top_index, top_score
 
+# Embedding API, can be set in this project if the cuda version has been updated 
 def bge_m3_embedding_function(texts):
     embedding_vectors = requests.post('http://192.168.0.151:3090/bge_m3_embedding', json={"texts":texts})
     return embedding_vectors
@@ -107,6 +109,7 @@ def check_lang_id(text):
 
 #########################
 
+# Generate the prompt in selected prompt form
 class Prompter(object):
     __slots__ = ("template", "_verbose")
 
@@ -134,6 +137,7 @@ class Prompter(object):
     def get_response(self, output: str) -> str:
         return output.split(self.template["response_split"])[1].strip()
 
+# Old FAQ functions to save FAQ in this repo, Has replaced by the standard semantic search API
 def add_qa_pairs(fragements, filename):
     # print(filename)
     # print(filename == "THE LINE - Fatigue Management Guideline")
@@ -164,6 +168,7 @@ def add_qa_pairs(fragements, filename):
 
 #######################  Google translate
  
+# Frank translate API
 def translate_text(target, text):
     """Translates text into the target language.
     Target must be an ISO 639-1 language code.
@@ -182,6 +187,7 @@ def translate_text(target, text):
     
     return result["translatedText"]
 
+# old stream flow, save message to redis, not in use
 def save_redis(chatId, msgId, response, ifend):
     if ifend:
         message = {"chatId": chatId,"msgId": msgId, "response": "[\FINAL\]"}
@@ -192,8 +198,8 @@ def save_redis(chatId, msgId, response, ifend):
     # if ifend:
     #     redis_conn.expire(stream_name, 3600)
 
+# Create OpenAI batch form prompt for LLM API
 def create_mixtral_messages_prompt(messages, question):
-    # Create OpenAI batch form prompt
 
     prompter = Prompter('./prompt.json')
     final_prompt = ''
@@ -226,9 +232,8 @@ def create_mixtral_messages_prompt(messages, question):
         final_prompt += prompt
     return final_prompt
 
-
+# Create OpenAI form messages for LLM workflow
 def create_mixtral_messages(messages, question):
-    # Create OpenAI form messages
     prompter = Prompter('./prompt.json')
     llm_messages = []
     if len(messages) == 0:

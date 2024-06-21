@@ -40,6 +40,7 @@ obsClient = ObsClient(access_key_id=ak, secret_access_key=sk, server=server)
 
 ###########
 
+# cut the document then make them to the prompt then let llm generate Questions for each fragements
 def document_split(
 	document_content,
 	filename,
@@ -276,6 +277,7 @@ def document_split(
 
 ###########
 
+# get the questions embedding and set the id for each line
 def document_embedding(token_name, documents, batch_size = 100):
 
 	fragement_num = conf.get("fragement", "fragement_num")
@@ -293,6 +295,8 @@ def document_embedding(token_name, documents, batch_size = 100):
 		j += 1
 	return documents
 
+
+# cal the similarity score (cosine)
 def get_score(fragements, question):
 	question_embedding = embedding_function.encode(question).tolist()
 	similarity = 0
