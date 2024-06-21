@@ -180,9 +180,6 @@ def translate_text(target, text):
     # will return a sequence of results for each text.
     result = translate_client.translate(text, target_language=target)
     
-    # print(u"Text: {}".format(result["input"]))
-    # print(u"Translation: {}".format(result["translatedText"]))
-    # print(u"Detected source language:
     return result["translatedText"]
 
 def save_redis(chatId, msgId, response, ifend):
@@ -196,6 +193,8 @@ def save_redis(chatId, msgId, response, ifend):
     #     redis_conn.expire(stream_name, 3600)
 
 def create_mixtral_messages_prompt(messages, question):
+    # Create OpenAI batch form prompt
+
     prompter = Prompter('./prompt.json')
     final_prompt = ''
     if len(messages) == 0:
@@ -229,6 +228,7 @@ def create_mixtral_messages_prompt(messages, question):
 
 
 def create_mixtral_messages(messages, question):
+    # Create OpenAI form messages
     prompter = Prompter('./prompt.json')
     llm_messages = []
     if len(messages) == 0:
